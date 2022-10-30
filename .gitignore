@@ -1,0 +1,5 @@
+.ufbt
+.vscode
+.sconsign.dblite
+
+toolchain/*

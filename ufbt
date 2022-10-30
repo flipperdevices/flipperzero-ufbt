@@ -1,0 +1,20 @@
+#!/bin/sh
+
+# shellcheck disable=SC2086 source=/dev/null
+# unofficial strict mode
+set -eu;
+
+# private variables
+SCRIPT_PATH="$(cd "$(dirname "$0")" && pwd -P)";
+SCONS_DEFAULT_FLAGS="-Q --warn=target-not-built";
+SCONS_EP="python3 -m SCons"
+
+# Check if .ufbt dir exists
+if [ ! -d "$SCRIPT_PATH/.ufbt" ]; then
+    echo "Bootstrapping ufbt...";
+    python3 "$SCRIPT_PATH/bootstrap.py" --branch hedger/fbt-mfbt-pt2;
+fi
+
+. "$SCRIPT_PATH/.ufbt/current/scripts/toolchain/fbtenv.sh";
+
+$SCONS_EP $SCONS_DEFAULT_FLAGS "$@"
