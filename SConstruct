@@ -156,6 +156,7 @@ extapps = appenv["_extapps"] = {
     "debug": {},
     "validators": {},
     "dist": {},
+    "installers": {},
     "resources_dist": None,
 }
 
@@ -166,6 +167,9 @@ def build_app_as_external(env, appdef):
     extapps["debug"][appdef.appid] = debug_elf
     extapps["validators"][appdef.appid] = validator
     extapps["dist"][appdef.appid] = (appdef.fap_category, compact_elf)
+    extapps["installers"][appdef.appid] = Install(
+        env.subst("$UFBT_APP_DIR/dist/"), compact_elf
+    )
 
 
 apps_to_build_as_faps = [
@@ -183,8 +187,9 @@ if appenv["FORCE"]:
 
 Alias("faps", extapps["compact"].values())
 Alias("faps", extapps["validators"].values())
+Alias("faps", extapps["validators"].values())
 
-Default(extapps["validators"].values())
+Default(extapps["installers"].values())
 
 
 # if appsrc := appenv.subst("$APPSRC"):
