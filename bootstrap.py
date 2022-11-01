@@ -200,6 +200,7 @@ def deploy_sdk(target_dir: str, sdk_loader: BaseSdkLoader, hw_target: str):
         BaseSdkLoader.SdkEntry.FW_BIN: ".",
     }
 
+    log.info(f"uFBT state dir: {target_dir}")
     shutil.rmtree(target_dir, ignore_errors=True)
 
     for entry, entry_dir in sdk_layout.items():
@@ -217,10 +218,6 @@ def deploy_sdk(target_dir: str, sdk_loader: BaseSdkLoader, hw_target: str):
 
 
 def main():
-    ufbt_work_dir = Path(".ufbt")
-    ufbt_download_dir = ufbt_work_dir / "download"
-    ufbt_state_dir = ufbt_work_dir / "current"
-
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--branch",
@@ -240,21 +237,25 @@ def main():
         default="f7",
     )
     parser.add_argument(
-        "--download-dir",
+        "--ufbt-dir",
         "-d",
-        help="Downloads directory",
-        default=ufbt_download_dir.absolute(),
+        help="uFBT state directory",
+        default=".ufbt",
     )
     args = parser.parse_args()
+
+    ufbt_work_dir = Path(args.ufbt_dir)
+    ufbt_download_dir = ufbt_work_dir / "download"
+    ufbt_state_dir = ufbt_work_dir / "current"
 
     if args.branch and args.channel:
         parser.error("Only one of --branch and --channel can be specified")
 
     if args.branch:
-        sdk_loader = BranchSdkLoader(args.branch, args.download_dir)
+        sdk_loader = BranchSdkLoader(args.branch, ufbt_download_dir)
     elif args.channel:
         sdk_loader = UpdateChannelSdkLoader(
-            UpdateChannelSdkLoader.UpdateChannel[args.channel], args.download_dir
+            UpdateChannelSdkLoader.UpdateChannel[args.channel], ufbt_download_dir
         )
     else:
         parser.error("One of --branch or --channel must be specified")
