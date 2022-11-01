@@ -20,6 +20,18 @@ SetOption("num_jobs", multiprocessing.cpu_count())
 SetOption("max_drift", 1)
 
 
+ufbt_variables = Variables("ufbt_options.py", ARGUMENTS)
+
+ufbt_variables.AddVariables(
+    PathVariable(
+        "UFBT_APP_DIR",
+        help="Application dir to work with",
+        validator=PathVariable.PathIsDir,
+        default="",
+    )
+)
+
+
 sdk_root = Dir("#.ufbt/current/sdk")
 sdk_data = {}
 with open(".ufbt/current/sdk/sdk.opts") as f:
@@ -67,6 +79,7 @@ for env_value_name in variables_to_forward:
 
 
 env = Environment(
+    variables=ufbt_variables,
     ENV=forward_os_env,
     toolpath=["#.ufbt/current/scripts/fbt_tools"],
     tools=[
@@ -92,8 +105,8 @@ env = Environment(
         ),
         "fbt_assets",
     ],
-    # VERBOSE=False,
-    VERBOSE=True,
+    VERBOSE=False,
+    # VERBOSE=True,
     FORCE=False,
     TEMPFILE=TempFileMunge,
     MAXLINELENGTH=2048,
@@ -125,7 +138,7 @@ env["LINKCOM"] = env["LINKCOM"].replace("$LINKFLAGS", "$LINKFLAGS_APP $LINKFLAGS
 # print(env.Dump())
 
 app_mount_point = Dir("#/app/")
-app_mount_point.addRepository(Dir("d:/tmp/apptest/dap_link"))
+app_mount_point.addRepository(Dir(env.subst("$UFBT_APP_DIR")))
 
 env.LoadAppManifest(app_mount_point)
 env.PrepareApplicationsBuild()

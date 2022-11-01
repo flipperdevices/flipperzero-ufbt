@@ -5,7 +5,6 @@ import os
 import atexit
 from ansi.color import fg, fx
 
-# print("cwd = ", os.getcwd())
 # sys.path.insert(0, os.path.join(os.getcwd(), "scripts"))
 sys.path.insert(0, os.path.join(os.getcwd(), ".ufbt/current/scripts"))
 # sys.path.insert(0, os.path.join(os.getcwd(), "lib/cxxheaderparser"))

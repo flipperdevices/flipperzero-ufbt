@@ -6,7 +6,7 @@ set -eu;
 
 # private variables
 SCRIPT_PATH="$(cd "$(dirname "$0")" && pwd -P)";
-SCONS_DEFAULT_FLAGS="-Q --warn=target-not-built";
+SCONS_DEFAULT_FLAGS="-Q --warn=target-not-built -C $SCRIPT_PATH";
 SCONS_EP="python3 -m SCons"
 
 # Check if .ufbt dir exists
@@ -17,6 +17,8 @@ fi
 
 FBT_TOOLCHAIN_PATH="${FBT_TOOLCHAIN_PATH:-$SCRIPT_PATH/.ufbt}";
 
+UFBT_APP_DIR=`pwd`;
+
 . "$SCRIPT_PATH/.ufbt/current/scripts/toolchain/fbtenv.sh";
 
-$SCONS_EP $SCONS_DEFAULT_FLAGS "$@"
+$SCONS_EP $SCONS_DEFAULT_FLAGS "UFBT_APP_DIR=$UFBT_APP_DIR" "$@"
