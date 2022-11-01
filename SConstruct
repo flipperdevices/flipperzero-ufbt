@@ -1,7 +1,11 @@
 from SCons.Platform import TempFileMunge
-from fbt.util import tempfile_arg_esc_func, single_quote, wrap_tempfile
+from fbt.util import (
+    tempfile_arg_esc_func,
+    single_quote,
+    extract_abs_dir_path,
+    wrap_tempfile,
+)
 from fbt.appmanifest import FlipperAppType
-
 
 import os
 import multiprocessing
@@ -32,8 +36,6 @@ with open(".ufbt/current/sdk/sdk.opts") as f:
             ).split(" ")
         else:
             sdk_data[key] = value
-
-# Repository("d:/tmp/apptest/VideoPoker")
 
 forward_os_env = {
     # Import PATH from OS env - scons doesn't do that by default
@@ -90,16 +92,15 @@ env = Environment(
         ),
         "fbt_assets",
     ],
-    VERBOSE=False,
+    # VERBOSE=False,
+    VERBOSE=True,
     FORCE=False,
     TEMPFILE=TempFileMunge,
     MAXLINELENGTH=2048,
     PROGSUFFIX=".elf",
     TEMPFILEARGESCFUNC=tempfile_arg_esc_func,
     SINGLEQUOTEFUNC=single_quote,
-    APPDIRS=[
-        ("", True),
-    ],
+    ABSPATHGETTERFUNC=extract_abs_dir_path,
     FBT_SCRIPT_DIR=Dir("#.ufbt/current/scripts"),
     ROOT_DIR=Dir("#"),
     FIRMWARE_BUILD_CFG="firmware",
@@ -123,7 +124,10 @@ env["LINKCOM"] = env["LINKCOM"].replace("$LINKFLAGS", "$LINKFLAGS_APP $LINKFLAGS
 
 # print(env.Dump())
 
-env.LoadApplicationManifests()
+app_mount_point = Dir("#/app/")
+app_mount_point.addRepository(Dir("d:/tmp/apptest/dap_link"))
+
+env.LoadAppManifest(app_mount_point)
 env.PrepareApplicationsBuild()
 
 # print(env["APPMGR"].known_apps)

@@ -1,9 +1,11 @@
 @echo off
 
-if not exist "%~dp0\.ufbt" (
-    echo "Bootstrapping ubt...""    
+if not exist "%~dp0\.ufbt\current" (
+    echo Bootstrapping ufbt...
     python "%~dp0\bootstrap.py" --branch hedger/fbt-mfbt-pt2
 )
+
+set FBT_TOOLCHAIN_ROOT=%~dp0\.ufbt\toolchain\x86_64-windows
 
 call "%~dp0\.ufbt\current\scripts\toolchain\fbtenv.cmd" env
 
