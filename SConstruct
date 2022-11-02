@@ -20,18 +20,6 @@ SetOption("num_jobs", multiprocessing.cpu_count())
 SetOption("max_drift", 1)
 
 
-ufbt_variables = Variables("ufbt_options.py", ARGUMENTS)
-
-ufbt_variables.AddVariables(
-    PathVariable(
-        "UFBT_APP_DIR",
-        help="Application dir to work with",
-        validator=PathVariable.PathIsDir,
-        default="",
-    )
-)
-
-
 sdk_root = Dir("#.ufbt/current/sdk")
 sdk_data = {}
 with open(".ufbt/current/sdk/sdk.opts") as f:
@@ -77,6 +65,7 @@ for env_value_name in variables_to_forward:
     if environ_value := os.environ.get(env_value_name, None):
         forward_os_env[env_value_name] = environ_value
 
+ufbt_variables = SConscript("site_scons/commandline.scons")
 
 env = Environment(
     variables=ufbt_variables,

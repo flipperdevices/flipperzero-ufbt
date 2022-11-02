@@ -1,0 +1,64 @@
+vars = Variables("ufbt_options.py", ARGUMENTS)
+
+vars.AddVariables(
+    BoolVariable(
+        "VERBOSE",
+        help="Print full commands",
+        default=False,
+    ),
+    BoolVariable(
+        "FORCE",
+        help="Force target action (for supported targets)",
+        default=False,
+    ),
+    BoolVariable(
+        "DEBUG",
+        help="Enable debug build",
+        default=True,
+    ),
+    BoolVariable(
+        "COMPACT",
+        help="Optimize for size",
+        default=False,
+    ),
+    PathVariable(
+        "SVD_FILE",
+        help="Path to SVD file",
+        validator=PathVariable.PathAccept,  # PathVariable.PathIsFile,
+        default="",
+    ),
+    PathVariable(
+        "OTHER_ELF",
+        help="Path to prebuilt ELF file to debug",
+        validator=PathVariable.PathAccept,
+        default="",
+    ),
+    (
+        "OPENOCD_OPTS",
+        "Options to pass to OpenOCD",
+        "",
+    ),
+    (
+        "BLACKMAGIC",
+        "Blackmagic probe location",
+        "auto",
+    ),
+    (
+        "OPENOCD_ADAPTER_SERIAL",
+        "OpenOCD adapter serial number",
+        "auto",
+    ),
+    (
+        "APPSRC",
+        "Application source directory for app to build & upload",
+        "",
+    ),
+    PathVariable(
+        "UFBT_APP_DIR",
+        help="Application dir to work with",
+        validator=PathVariable.PathIsDir,
+        default="",
+    ),
+)
+
+Return("vars")
