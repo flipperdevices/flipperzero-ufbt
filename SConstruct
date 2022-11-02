@@ -48,15 +48,17 @@ for env_value_name in variables_to_forward:
     if environ_value := os.environ.get(env_value_name, None):
         forward_os_env[env_value_name] = environ_value
 
-# Basic environment init - loads SDK state, sets up paths, etc.
+# Core environment init - loads SDK state, sets up paths, etc.
 core_env = Environment(
     variables=ufbt_variables,
     ENV=forward_os_env,
     tools=[
         "ufbt_state",
+        ("ufbt_help", {"vars": ufbt_variables}),
     ],
 )
 
+# Base environment with all tools loaded from SDK
 env = core_env.Clone(
     toolpath=[core_env["FBT_SCRIPT_DIR"].Dir("fbt_tools")],
     tools=[
@@ -95,25 +97,26 @@ env = core_env.Clone(
 wrap_tempfile(env, "LINKCOM")
 wrap_tempfile(env, "ARCOM")
 
-env["CCCOM"] = env["CCCOM"].replace("$CFLAGS", "$CFLAGS_APP $CFLAGS")
-env["CXXCOM"] = env["CXXCOM"].replace("$CXXFLAGS", "$CXXFLAGS_APP $CXXFLAGS")
-env["LINKCOM"] = env["LINKCOM"].replace("$LINKFLAGS", "$LINKFLAGS_APP $LINKFLAGS")
-
-
 # print(env.Dump())
 
+# App build environment
+
+appenv = env.Clone(
+    CCCOM=env["CCCOM"].replace("$CFLAGS", "$CFLAGS_APP $CFLAGS"),
+    CXXCOM=env["CXXCOM"].replace("$CXXFLAGS", "$CXXFLAGS_APP $CXXFLAGS"),
+    LINKCOM=env["LINKCOM"].replace("$LINKFLAGS", "$LINKFLAGS_APP $LINKFLAGS"),
+)
+
+
 app_mount_point = Dir("#/app/")
-app_mount_point.addRepository(Dir(env.subst("$UFBT_APP_DIR")))
+app_mount_point.addRepository(Dir(appenv.subst("$UFBT_APP_DIR")))
 
-env.LoadAppManifest(app_mount_point)
-env.PrepareApplicationsBuild()
+appenv.LoadAppManifest(app_mount_point)
+appenv.PrepareApplicationsBuild()
 
-# print(env["APPMGR"].known_apps)
+# print(appenv["APPMGR"].known_apps)
 
 #######################
-
-
-appenv = env.Clone()
 
 
 extapps = appenv["_extapps"] = {
@@ -150,9 +153,12 @@ for apptype in apps_to_build_as_faps:
 if appenv["FORCE"]:
     appenv.AlwaysBuild(extapps["compact"].values())
 
+
+# Final steps - target aliases
+
 Alias("faps", extapps["compact"].values())
 Alias("faps", extapps["validators"].values())
-Alias("faps", extapps["validators"].values())
+Alias("faps", extapps["installers"].values())
 
 Default(extapps["installers"].values())
 

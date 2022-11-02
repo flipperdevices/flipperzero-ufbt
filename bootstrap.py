@@ -78,7 +78,7 @@ class BaseSdkLoader:
         return "any" if file_type in self.ANY_TARGET_FILE_TYPES else target
 
     def _fetch_file(self, url: str):
-        log.info(f"Fetching {url}")
+        log.debug(f"Fetching {url}")
         file_name = PurePosixPath(unquote(urlparse(url).path)).parts[-1]
         file_path = os.path.join(self._download_dir, file_name)
 
@@ -251,6 +251,7 @@ def deploy_sdk(target_dir: str, sdk_loader: BaseSdkLoader, hw_target: str):
 
     with open(os.path.join(target_dir, "sdk_state.json"), "w") as f:
         json.dump(sdk_state, f, indent=4)
+    log.info(f"SDK deployed at {target_dir}")
 
 
 def main():
