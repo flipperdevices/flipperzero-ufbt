@@ -51,20 +51,22 @@ def generate(env, **kw):
         raise SConsEnvironmentError("SDK state file doesn't match hardware target")
 
     env.SetDefault(
-        FIRMWARE_BUILD_CFG="firmware",
-        TARGET_HW=int(sdk_data["hardware"]),
-        CFLAGS_APP=sdk_data["cc_args"],
-        CXXFLAGS_APP=sdk_data["cpp_args"],
-        LINKFLAGS_APP=sdk_data["linker_args"],
-        LIBS=sdk_data["linker_libs"],
         # Paths
         SDK_DEFINITION=env.File(sdk_data["sdk_symbols"][0]),
+        UFBT_STATE_DIR=env.Dir(sdk_state_dir),
         FBT_SCRIPT_DIR=env.Dir(
             os.path.join(sdk_state_dir, sdk_components.get("scripts", "."), "scripts")
         ),
         LIBPATH=env.Dir(os.path.join(sdk_state_dir, sdk_components.get("lib", "lib"))),
         FW_ELF=env.File(os.path.join(sdk_state_dir, sdk_components.get("elf"))),
         FW_BIN=env.File(os.path.join(sdk_state_dir, sdk_components.get("fwbin"))),
+        # Build variables
+        FIRMWARE_BUILD_CFG="firmware",
+        TARGET_HW=int(sdk_data["hardware"]),
+        CFLAGS_APP=sdk_data["cc_args"],
+        CXXFLAGS_APP=sdk_data["cpp_args"],
+        LINKFLAGS_APP=sdk_data["linker_args"],
+        LIBS=sdk_data["linker_libs"],
     )
 
 

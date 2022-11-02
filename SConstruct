@@ -48,13 +48,18 @@ for env_value_name in variables_to_forward:
     if environ_value := os.environ.get(env_value_name, None):
         forward_os_env[env_value_name] = environ_value
 
-
-env = Environment(
+# Basic environment init - loads SDK state, sets up paths, etc.
+core_env = Environment(
     variables=ufbt_variables,
     ENV=forward_os_env,
-    toolpath=["#.ufbt/current/scripts/fbt_tools"],
     tools=[
         "ufbt_state",
+    ],
+)
+
+env = core_env.Clone(
+    toolpath=[core_env["FBT_SCRIPT_DIR"].Dir("fbt_tools")],
+    tools=[
         "fbt_tweaks",
         (
             "crosscc",
@@ -77,9 +82,6 @@ env = Environment(
         ),
         "fbt_assets",
     ],
-    VERBOSE=False,
-    # VERBOSE=True,
-    FORCE=False,
     TEMPFILE=TempFileMunge,
     MAXLINELENGTH=2048,
     PROGSUFFIX=".elf",
