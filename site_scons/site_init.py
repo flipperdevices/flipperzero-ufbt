@@ -1,19 +1,13 @@
 from SCons.Script import GetBuildFailures
+import SCons.Errors
 
-import sys
-import os
 import atexit
 from ansi.color import fg, fx
-
-# sys.path.insert(0, os.path.join(os.getcwd(), "scripts"))
-sys.path.insert(0, os.path.join(os.getcwd(), ".ufbt/current/scripts"))
-# sys.path.insert(0, os.path.join(os.getcwd(), "lib/cxxheaderparser"))
 
 
 def bf_to_str(bf):
     """Convert an element of GetBuildFailures() to a string
     in a useful way."""
-    import SCons.Errors
 
     if bf is None:  # unknown targets product None in list
         return "(unknown tgt)"

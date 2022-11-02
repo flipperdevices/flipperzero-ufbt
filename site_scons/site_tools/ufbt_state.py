@@ -2,6 +2,7 @@ from SCons.Errors import SConsEnvironmentError
 
 import json
 import os
+import sys
 from functools import reduce
 
 
@@ -61,6 +62,7 @@ def generate(env, **kw):
         FW_ELF=env.File(os.path.join(sdk_state_dir, sdk_components.get("elf"))),
         FW_BIN=env.File(os.path.join(sdk_state_dir, sdk_components.get("fwbin"))),
         # Build variables
+        ROOT_DIR=env.Dir("#"),
         FIRMWARE_BUILD_CFG="firmware",
         TARGET_HW=int(sdk_data["hardware"]),
         CFLAGS_APP=sdk_data["cc_args"],
@@ -68,6 +70,8 @@ def generate(env, **kw):
         LINKFLAGS_APP=sdk_data["linker_args"],
         LIBS=sdk_data["linker_libs"],
     )
+
+    sys.path.insert(0, env["ROOT_DIR"].Dir(".ufbt/current/scripts").abspath)
 
 
 def exists(env):

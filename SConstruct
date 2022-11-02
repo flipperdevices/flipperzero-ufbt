@@ -1,11 +1,4 @@
 from SCons.Platform import TempFileMunge
-from fbt.util import (
-    tempfile_arg_esc_func,
-    single_quote,
-    extract_abs_dir_path,
-    wrap_tempfile,
-)
-from fbt.appmanifest import FlipperAppType
 
 import os
 import multiprocessing
@@ -58,6 +51,16 @@ core_env = Environment(
     ],
 )
 
+# Now we can import stuff bundled with SDK - it was added to sys.path by ufbt_state
+
+from fbt.util import (
+    tempfile_arg_esc_func,
+    single_quote,
+    extract_abs_dir_path,
+    wrap_tempfile,
+)
+from fbt.appmanifest import FlipperAppType
+
 # Base environment with all tools loaded from SDK
 env = core_env.Clone(
     toolpath=[core_env["FBT_SCRIPT_DIR"].Dir("fbt_tools")],
@@ -72,8 +75,8 @@ env = core_env.Clone(
         ),
         "fwbin",
         "python3",
-        "sconsmodular",
         "sconsrecursiveglob",
+        "sconsmodular",
         "ccache",
         "fbt_apps",
         (
@@ -90,7 +93,6 @@ env = core_env.Clone(
     TEMPFILEARGESCFUNC=tempfile_arg_esc_func,
     SINGLEQUOTEFUNC=single_quote,
     ABSPATHGETTERFUNC=extract_abs_dir_path,
-    ROOT_DIR=Dir("#"),
     APPS=[],
 )
 
