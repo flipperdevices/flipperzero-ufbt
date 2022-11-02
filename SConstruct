@@ -101,6 +101,42 @@ wrap_tempfile(env, "ARCOM")
 
 # print(env.Dump())
 
+# Dist env
+
+dist_env = env.Clone(
+    tools=[
+        "fbt_dist",
+        "fbt_debugopts",
+        "openocd",
+        "blackmagic",
+        "jflash",
+    ],
+    ENV=os.environ,
+    OPENOCD_OPTS=[
+        "-f",
+        "interface/stlink.cfg",
+        "-c",
+        "transport select hla_swd",
+        "-f",
+        "${UFBT_STATE_DIR}/debug/stm32wbx.cfg",
+        "-c",
+        "stm32wbx.cpu configure -rtos auto",
+    ],
+)
+
+openocd_target = dist_env.OpenOCDFlash(
+    dist_env["UFBT_STATE_DIR"].File("flash"),
+    dist_env["FW_BIN"],
+    OPENOCD_COMMAND=[
+        "-c",
+        "program ${SOURCE.posix} reset exit 0x08000000",
+    ],
+)
+dist_env.Alias("firmware_flash", openocd_target)
+if env["FORCE"]:
+    env.AlwaysBuild(openocd_target)
+
+
 # App build environment
 
 appenv = env.Clone(
