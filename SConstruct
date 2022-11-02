@@ -9,8 +9,6 @@ from fbt.appmanifest import FlipperAppType
 
 import os
 import multiprocessing
-import json
-from functools import reduce
 
 DefaultEnvironment(tools=[])
 
@@ -20,22 +18,7 @@ SetOption("num_jobs", multiprocessing.cpu_count())
 SetOption("max_drift", 1)
 
 
-sdk_root = Dir("#.ufbt/current/sdk")
-sdk_data = {}
-with open(".ufbt/current/sdk/sdk.opts") as f:
-    sdk_json_data = json.load(f)
-    replacements = {
-        sdk_json_data["app_ep_subst"]: "${APP_ENTRY}",
-        sdk_json_data["sdk_path_subst"]: sdk_root.path.replace("\\", "/"),
-    }
-
-    for key, value in sdk_json_data.items():
-        if key in ("cc_args", "cpp_args", "linker_args", "linker_libs", "sdk_symbols"):
-            sdk_data[key] = reduce(
-                lambda a, kv: a.replace(*kv), replacements.items(), value
-            ).split(" ")
-        else:
-            sdk_data[key] = value
+ufbt_variables = SConscript("site_scons/commandline.scons")
 
 forward_os_env = {
     # Import PATH from OS env - scons doesn't do that by default
@@ -57,21 +40,21 @@ variables_to_forward = [
     # Colors for tools
     "TERM",
 ]
-# FIXME
-# if proxy_env := GetOption("proxy_env"):
-#     variables_to_forward.extend(proxy_env.split(","))
+
+if proxy_env := GetOption("proxy_env"):
+    variables_to_forward.extend(proxy_env.split(","))
 
 for env_value_name in variables_to_forward:
     if environ_value := os.environ.get(env_value_name, None):
         forward_os_env[env_value_name] = environ_value
 
-ufbt_variables = SConscript("site_scons/commandline.scons")
 
 env = Environment(
     variables=ufbt_variables,
     ENV=forward_os_env,
     toolpath=["#.ufbt/current/scripts/fbt_tools"],
     tools=[
+        "ufbt_state",
         "fbt_tweaks",
         (
             "crosscc",
@@ -103,16 +86,7 @@ env = Environment(
     TEMPFILEARGESCFUNC=tempfile_arg_esc_func,
     SINGLEQUOTEFUNC=single_quote,
     ABSPATHGETTERFUNC=extract_abs_dir_path,
-    FBT_SCRIPT_DIR=Dir("#.ufbt/current/scripts"),
     ROOT_DIR=Dir("#"),
-    FIRMWARE_BUILD_CFG="firmware",
-    SDK_DEFINITION=File(f"#{sdk_data['sdk_symbols'][0]}"),
-    TARGET_HW=int(sdk_data["hardware"]),
-    CFLAGS_APP=sdk_data["cc_args"],
-    CXXFLAGS_APP=sdk_data["cpp_args"],
-    LINKFLAGS_APP=sdk_data["linker_args"],
-    LIBS=sdk_data["linker_libs"],
-    LIBPATH=Dir("#.ufbt/current/lib"),
     APPS=[],
 )
 
