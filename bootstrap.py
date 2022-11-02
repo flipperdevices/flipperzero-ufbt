@@ -45,7 +45,7 @@ class FileType(enum.Enum):
 class BaseSdkLoader:
     class SdkEntry(enum.Enum):
         SDK = "sdk"
-        SCRIPTS = "bin"
+        SCRIPTS = "scripts"
         LIB = "lib"
         FW_ELF = "elf"
         FW_BIN = "fwbin"
@@ -69,6 +69,9 @@ class BaseSdkLoader:
 
     # Returns local FS path. Downloads file if necessary
     def get_sdk_component(self, entry: SdkEntry, target: str):
+        raise NotImplementedError()
+
+    def get_metadata(self):
         raise NotImplementedError()
 
     def _fixup_target_type(self, file_type: FileType, target: str) -> str:
@@ -95,6 +98,7 @@ class BranchSdkLoader(BaseSdkLoader):
         def reset(self):
             super().reset()
             self.files = {}
+            self.version = None
 
         def handle_starttag(self, tag, attrs):
             if tag == "a" and (href := dict(attrs).get("href", None)):
@@ -103,12 +107,18 @@ class BranchSdkLoader(BaseSdkLoader):
                     file_type_str = f"{file_type}_{ext}".upper()
                     if file_type := FileType._member_map_.get(file_type_str, None):
                         self.files[(file_type, target)] = href
+                    if self.version and self.version != version:
+                        raise RuntimeError(
+                            f"Found multiple versions: {self.version} and {version}"
+                        )
+                    self.version = version
 
     def __init__(self, branch: str, download_dir: str):
         super().__init__(download_dir)
         self._branch = branch
         self._branch_url = f"https://update.flipperzero.one/builds/firmware/{branch}/"
         self._branch_files = {}
+        self._version = None
         self._fetch_branch()
 
     def _fetch_branch(self):
@@ -119,6 +129,13 @@ class BranchSdkLoader(BaseSdkLoader):
             extractor = BranchSdkLoader.LinkExtractor()
             extractor.feed(html)
             self._branch_files = extractor.files
+            self._version = extractor.version
+
+    def get_metadata(self):
+        return {
+            "branch": self._branch,
+            "version": self._version,
+        }
 
     def get_sdk_component(self, entry: BaseSdkLoader.SdkEntry, target: str):
         file_type = self.ENTRY_TO_FILE_TYPE[entry]
@@ -149,6 +166,12 @@ class UpdateChannelSdkLoader(BaseSdkLoader):
             raise ValueError(f"Invalid file url")
 
         return self._fetch_file(file_url)
+
+    def get_metadata(self):
+        return {
+            "channel": self.channel.value,
+            "version": self.version_info["version"],
+        }
 
     @staticmethod
     def _fetch_version(channel: UpdateChannel):
@@ -203,18 +226,31 @@ def deploy_sdk(target_dir: str, sdk_loader: BaseSdkLoader, hw_target: str):
     log.info(f"uFBT state dir: {target_dir}")
     shutil.rmtree(target_dir, ignore_errors=True)
 
+    sdk_state = {
+        "meta": {"hw_target": hw_target, **sdk_loader.get_metadata()},
+        "components": {},
+    }
     for entry, entry_dir in sdk_layout.items():
         log.info(f"Deploying {entry} to {entry_dir}")
         sdk_component_path = sdk_loader.get_sdk_component(entry, hw_target)
-        target_path = os.path.join(target_dir, entry_dir)
+        component_dst_path = os.path.join(target_dir, entry_dir)
         if sdk_component_path.endswith(".zip"):
             with ZipFile(sdk_component_path, "r") as zip_file:
-                zip_file.extractall(target_path)
+                zip_file.extractall(component_dst_path)
         elif sdk_component_path.endswith(".tgz"):
             with tarfile.open(sdk_component_path, "r:gz") as tar_file:
-                tar_file.extractall(target_path)
+                tar_file.extractall(component_dst_path)
         else:
-            shutil.copy2(sdk_component_path, target_path)
+            component_dst_path = os.path.join(
+                component_dst_path, os.path.basename(sdk_component_path)
+            )
+            shutil.copy2(sdk_component_path, component_dst_path)
+        sdk_state["components"][entry.value] = os.path.relpath(
+            component_dst_path, target_dir
+        )
+
+    with open(os.path.join(target_dir, "sdk_state.json"), "w") as f:
+        json.dump(sdk_state, f, indent=4)
 
 
 def main():

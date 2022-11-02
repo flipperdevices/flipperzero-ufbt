@@ -11,16 +11,17 @@ vars.AddVariables(
         help="Force target action (for supported targets)",
         default=False,
     ),
-    BoolVariable(
-        "DEBUG",
-        help="Enable debug build",
-        default=True,
-    ),
-    BoolVariable(
-        "COMPACT",
-        help="Optimize for size",
-        default=False,
-    ),
+    # These 2 are inherited from SDK
+    # BoolVariable(
+    #     "DEBUG",
+    #     help="Enable debug build",
+    #     default=True,
+    # ),
+    # BoolVariable(
+    #     "COMPACT",
+    #     help="Optimize for size",
+    #     default=False,
+    # ),
     PathVariable(
         "SVD_FILE",
         help="Path to SVD file",
