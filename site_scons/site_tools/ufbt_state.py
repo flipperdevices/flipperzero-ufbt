@@ -63,8 +63,9 @@ def generate(env, **kw):
             "scripts"
         ),
         LIBPATH=sdk_state_dir_node.Dir(sdk_components.get("lib", "lib")),
-        FW_ELF=sdk_state_dir_node.File(sdk_components.get("elf")),
+        FW_ELF=sdk_state_dir_node.File(sdk_components.get("fwelf")),
         FW_BIN=sdk_state_dir_node.File(sdk_components.get("fwbin")),
+        UPDATE_BUNDLE_DIR=sdk_state_dir_node.Dir(sdk_components.get("fwbundle")),
         # Build variables
         ROOT_DIR=env.Dir("#"),
         FIRMWARE_BUILD_CFG="firmware",

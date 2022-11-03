@@ -144,6 +144,14 @@ firmware_debug = dist_env.PhonyTarget(
     GDBREMOTE="${OPENOCD_GDB_PIPE}",
 )
 
+flash_usb_full = dist_env.UsbInstall(
+    dist_env["UFBT_STATE_DIR"].File("usbinstall"),
+    [],
+)
+dist_env.AlwaysBuild(flash_usb_full)
+dist_env.Alias("flash_usb", flash_usb_full)
+dist_env.Alias("flash_usb_full", flash_usb_full)
+
 # App build environment
 
 appenv = env.Clone(

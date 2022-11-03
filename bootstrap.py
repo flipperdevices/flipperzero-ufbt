@@ -47,8 +47,9 @@ class BaseSdkLoader:
         SDK = "sdk"
         SCRIPTS = "scripts"
         LIB = "lib"
-        FW_ELF = "elf"
+        FW_ELF = "fwelf"
         FW_BIN = "fwbin"
+        FW_BUNDLE = "fwbundle"
 
     ANY_TARGET_FILE_TYPES = (
         FileType.CORE2_FIRMWARE_TGZ,
@@ -62,6 +63,7 @@ class BaseSdkLoader:
         SdkEntry.LIB: FileType.LIB_ZIP,
         SdkEntry.FW_ELF: FileType.FIRMWARE_ELF,
         SdkEntry.FW_BIN: FileType.FULL_BIN,
+        SdkEntry.FW_BUNDLE: FileType.UPDATE_TGZ,
     }
 
     def __init__(self, download_dir: str):
@@ -218,11 +220,17 @@ class UpdateChannelSdkLoader(BaseSdkLoader):
 
 def deploy_sdk(target_dir: str, sdk_loader: BaseSdkLoader, hw_target: str):
     sdk_layout = {
-        BaseSdkLoader.SdkEntry.SDK: "sdk",
-        BaseSdkLoader.SdkEntry.SCRIPTS: ".",
-        BaseSdkLoader.SdkEntry.LIB: "lib",
-        BaseSdkLoader.SdkEntry.FW_ELF: ".",
-        BaseSdkLoader.SdkEntry.FW_BIN: ".",
+        BaseSdkLoader.SdkEntry.SDK: ("sdk", None),
+        BaseSdkLoader.SdkEntry.SCRIPTS: (".", None),
+        BaseSdkLoader.SdkEntry.LIB: ("lib", None),
+        BaseSdkLoader.SdkEntry.FW_ELF: (".", None),
+        BaseSdkLoader.SdkEntry.FW_BIN: (".", None),
+        BaseSdkLoader.SdkEntry.FW_BUNDLE: (
+            ".",
+            lambda s: os.path.splitext(os.path.basename(s))[0].replace(
+                "flipper-z-", ""  # ugly
+            ),
+        ),
     }
 
     log.info(f"uFBT state dir: {target_dir}")
@@ -232,7 +240,7 @@ def deploy_sdk(target_dir: str, sdk_loader: BaseSdkLoader, hw_target: str):
         "meta": {"hw_target": hw_target, **sdk_loader.get_metadata()},
         "components": {},
     }
-    for entry, entry_dir in sdk_layout.items():
+    for entry, (entry_dir, entry_path_converter) in sdk_layout.items():
         log.info(f"Deploying {entry} to {entry_dir}")
         sdk_component_path = sdk_loader.get_sdk_component(entry, hw_target)
         component_dst_path = os.path.join(target_dir, entry_dir)
@@ -247,13 +255,16 @@ def deploy_sdk(target_dir: str, sdk_loader: BaseSdkLoader, hw_target: str):
                 component_dst_path, os.path.basename(sdk_component_path)
             )
             shutil.copy2(sdk_component_path, component_dst_path)
-        sdk_state["components"][entry.value] = os.path.relpath(
-            component_dst_path, target_dir
-        )
+
+        if entry_path_converter:
+            component_meta_path = entry_path_converter(sdk_component_path)
+        else:
+            component_meta_path = os.path.relpath(component_dst_path, target_dir)
+        sdk_state["components"][entry.value] = component_meta_path
 
     with open(os.path.join(target_dir, "sdk_state.json"), "w") as f:
         json.dump(sdk_state, f, indent=4)
-    log.info(f"SDK deployed at {target_dir}")
+    log.info("SDK deployed.")
 
 
 def main():
