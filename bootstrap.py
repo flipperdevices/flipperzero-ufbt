@@ -93,7 +93,7 @@ class BaseSdkLoader:
 
 class BranchSdkLoader(BaseSdkLoader):
     class LinkExtractor(HTMLParser):
-        FILE_NAME_RE = re.compile(r"flipper-z-(\w+)-(\w+)-(.+)\.(\w+)")
+        FILE_NAME_RE = re.compile(r"flipper-z-(\w+)-(\w+)-([^\.]+)\.(\w+)")
 
         def reset(self):
             super().reset()
@@ -107,11 +107,12 @@ class BranchSdkLoader(BaseSdkLoader):
                     file_type_str = f"{file_type}_{ext}".upper()
                     if file_type := FileType._member_map_.get(file_type_str, None):
                         self.files[(file_type, target)] = href
-                    if self.version and self.version != version:
+                    if not self.version:
+                        self.version = version
+                    elif not version.startswith(self.version):
                         raise RuntimeError(
                             f"Found multiple versions: {self.version} and {version}"
                         )
-                    self.version = version
 
     def __init__(self, branch: str, download_dir: str):
         super().__init__(download_dir)
@@ -130,6 +131,7 @@ class BranchSdkLoader(BaseSdkLoader):
             extractor.feed(html)
             self._branch_files = extractor.files
             self._version = extractor.version
+        log.info(f"Found version {self._version}")
 
     def get_metadata(self):
         return {

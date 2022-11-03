@@ -51,16 +51,20 @@ def generate(env, **kw):
     if not sdk_state["meta"]["hw_target"].endswith(sdk_data["hardware"]):
         raise SConsEnvironmentError("SDK state file doesn't match hardware target")
 
+    sdk_state_dir_node = env.Dir(sdk_state_dir)
     env.SetDefault(
         # Paths
         SDK_DEFINITION=env.File(sdk_data["sdk_symbols"][0]),
-        UFBT_STATE_DIR=env.Dir(sdk_state_dir),
-        FBT_SCRIPT_DIR=env.Dir(
-            os.path.join(sdk_state_dir, sdk_components.get("scripts", "."), "scripts")
+        UFBT_STATE_DIR=sdk_state_dir_node,
+        FBT_DEBUG_DIR=sdk_state_dir_node.Dir(sdk_components.get("scripts", "."))
+        .Dir("debug")
+        .path.replace("\\", "/"),  # ugly hack for OpenOCD on Windows
+        FBT_SCRIPT_DIR=sdk_state_dir_node.Dir(sdk_components.get("scripts", ".")).Dir(
+            "scripts"
         ),
-        LIBPATH=env.Dir(os.path.join(sdk_state_dir, sdk_components.get("lib", "lib"))),
-        FW_ELF=env.File(os.path.join(sdk_state_dir, sdk_components.get("elf"))),
-        FW_BIN=env.File(os.path.join(sdk_state_dir, sdk_components.get("fwbin"))),
+        LIBPATH=sdk_state_dir_node.Dir(sdk_components.get("lib", "lib")),
+        FW_ELF=sdk_state_dir_node.File(sdk_components.get("elf")),
+        FW_BIN=sdk_state_dir_node.File(sdk_components.get("fwbin")),
         # Build variables
         ROOT_DIR=env.Dir("#"),
         FIRMWARE_BUILD_CFG="firmware",
@@ -71,7 +75,7 @@ def generate(env, **kw):
         LIBS=sdk_data["linker_libs"],
     )
 
-    sys.path.insert(0, env["ROOT_DIR"].Dir(".ufbt/current/scripts").abspath)
+    sys.path.insert(0, env["FBT_SCRIPT_DIR"].abspath)
 
 
 def exists(env):

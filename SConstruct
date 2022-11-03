@@ -118,7 +118,7 @@ dist_env = env.Clone(
         "-c",
         "transport select hla_swd",
         "-f",
-        "${UFBT_STATE_DIR}/debug/stm32wbx.cfg",
+        "${FBT_DEBUG_DIR}/stm32wbx.cfg",
         "-c",
         "stm32wbx.cpu configure -rtos auto",
     ],
@@ -136,6 +136,13 @@ dist_env.Alias("firmware_flash", openocd_target)
 if env["FORCE"]:
     env.AlwaysBuild(openocd_target)
 
+firmware_debug = dist_env.PhonyTarget(
+    "debug",
+    "${GDBPYCOM}",
+    source=dist_env["FW_ELF"],
+    GDBOPTS="${GDBOPTS_BASE}",
+    GDBREMOTE="${OPENOCD_GDB_PIPE}",
+)
 
 # App build environment
 
