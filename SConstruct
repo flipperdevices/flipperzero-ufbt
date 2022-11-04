@@ -171,57 +171,57 @@ appenv.PrepareApplicationsBuild()
 
 #######################
 
-
-extapps = appenv["_extapps"] = {
-    "compact": {},
-    "debug": {},
-    "validators": {},
-    "dist": {},
-    "installers": {},
-    "resources_dist": None,
-}
-
-
-def build_app_as_external(env, appdef):
-    compact_elf, debug_elf, validator = env.BuildAppElf(appdef)
-    extapps["compact"][appdef.appid] = compact_elf
-    extapps["debug"][appdef.appid] = debug_elf
-    extapps["validators"][appdef.appid] = validator
-    extapps["dist"][appdef.appid] = (appdef.fap_category, compact_elf)
-    extapps["installers"][appdef.appid] = Install(
-        env.subst("$UFBT_APP_DIR/dist/"), compact_elf
-    )
-
+extapps = appenv["EXT_APPS"]
 
 apps_to_build_as_faps = [
     FlipperAppType.PLUGIN,
     FlipperAppType.EXTERNAL,
 ]
 
-for apptype in apps_to_build_as_faps:
-    for app in appenv["APPBUILD"].get_apps_of_type(apptype, True):
-        build_app_as_external(appenv, app)
+known_extapps = [
+    app
+    for apptype in apps_to_build_as_faps
+    for app in appenv["APPBUILD"].get_apps_of_type(apptype, True)
+]
+# print(f"Known external apps: {known_extapps}")
 
+for app in known_extapps:
+    app_artifacts = appenv.BuildAppElf(app)
+    app_src_dir = extract_abs_dir_path(app_artifacts.app._appdir)
+    app_artifacts.installer = [
+        appenv.Install(os.path.join(app_src_dir, "dist"), app_artifacts.compact),
+        appenv.Install(os.path.join(app_src_dir, "dist", "debug"), app_artifacts.debug),
+    ]
 
 if appenv["FORCE"]:
-    appenv.AlwaysBuild(extapps["compact"].values())
-
+    appenv.AlwaysBuild(extapp.compact for extapp in extapps.values())
 
 # Final steps - target aliases
 
-Alias("faps", extapps["compact"].values())
-Alias("faps", extapps["validators"].values())
-Alias("faps", extapps["installers"].values())
+install_and_check = [
+    (extapp.installer, extapp.validator) for extapp in extapps.values()
+]
+Alias(
+    "faps",
+    install_and_check,
+)
+Default(install_and_check)
 
-Default(extapps["installers"].values())
 
+# launch_app handler
 
-# if appsrc := appenv.subst("$APPSRC"):
-#     app_manifest, fap_file, app_validator = appenv.GetExtAppFromPath(appsrc)
-#     appenv.PhonyTarget(
-#         "launch_app",
-#         '${PYTHON3} scripts/runfap.py ${SOURCE} --fap_dst_dir "/ext/apps/${FAP_CATEGORY}"',
-#         source=fap_file,
-#         FAP_CATEGORY=app_manifest.fap_category,
-#     )
-#     appenv.Alias("launch_app", app_validator)
+app_artifacts = None
+if len(extapps) == 1:
+    app_artifacts = list(extapps.values())[0]
+else:  # more than 1 app - try to find one with matching id
+    if appsrc := appenv.subst("$APPSRC"):
+        app_artifacts = appenv.GetExtAppFromPath(appsrc)
+
+if app_artifacts:
+    appenv.PhonyTarget(
+        "launch_app",
+        '${PYTHON3} "${APP_RUN_SCRIPT}" ${SOURCE} --fap_dst_dir "/ext/apps/${FAP_CATEGORY}"',
+        source=app_artifacts.compact,
+        FAP_CATEGORY=app_artifacts.app.fap_category,
+    )
+    appenv.Alias("launch_app", app_artifacts.validator)
