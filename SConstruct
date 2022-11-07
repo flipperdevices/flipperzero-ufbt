@@ -56,6 +56,7 @@ core_env = Environment(
 from fbt.util import (
     tempfile_arg_esc_func,
     single_quote,
+    extract_abs_dir,
     extract_abs_dir_path,
     wrap_tempfile,
 )
@@ -79,14 +80,11 @@ env = core_env.Clone(
         "sconsmodular",
         "ccache",
         "fbt_apps",
-        (
-            "fbt_extapps",
-            {
-                "EXT_APPS_WORK_DIR": "#.ufbt/build",
-            },
-        ),
+        "fbt_extapps",
         "fbt_assets",
+        ("compilation_db", {"COMPILATIONDB_COMSTR": "\tCDB\t${TARGET}"}),
     ],
+    FBT_FAP_DEBUG_ELF_ROOT=Dir("#.ufbt/build"),
     TEMPFILE=TempFileMunge,
     MAXLINELENGTH=2048,
     PROGSUFFIX=".elf",
@@ -142,6 +140,7 @@ firmware_debug = dist_env.PhonyTarget(
     source=dist_env["FW_ELF"],
     GDBOPTS="${GDBOPTS_BASE}",
     GDBREMOTE="${OPENOCD_GDB_PIPE}",
+    FBT_FAP_DEBUG_ELF_ROOT=env["FW_ELF"],
 )
 
 flash_usb_full = dist_env.UsbInstall(
@@ -158,11 +157,13 @@ appenv = env.Clone(
     CCCOM=env["CCCOM"].replace("$CFLAGS", "$CFLAGS_APP $CFLAGS"),
     CXXCOM=env["CXXCOM"].replace("$CXXFLAGS", "$CXXFLAGS_APP $CXXFLAGS"),
     LINKCOM=env["LINKCOM"].replace("$LINKFLAGS", "$LINKFLAGS_APP $LINKFLAGS"),
+    COMPILATIONDB_USE_ABSPATH=True,
 )
 
 
+original_app_dir = Dir(appenv.subst("$UFBT_APP_DIR"))
 app_mount_point = Dir("#/app/")
-app_mount_point.addRepository(Dir(appenv.subst("$UFBT_APP_DIR")))
+app_mount_point.addRepository(original_app_dir)
 
 appenv.LoadAppManifest(app_mount_point)
 appenv.PrepareApplicationsBuild()
@@ -187,10 +188,10 @@ known_extapps = [
 
 for app in known_extapps:
     app_artifacts = appenv.BuildAppElf(app)
-    app_src_dir = extract_abs_dir_path(app_artifacts.app._appdir)
+    app_src_dir = extract_abs_dir(app_artifacts.app._appdir)
     app_artifacts.installer = [
-        appenv.Install(os.path.join(app_src_dir, "dist"), app_artifacts.compact),
-        appenv.Install(os.path.join(app_src_dir, "dist", "debug"), app_artifacts.debug),
+        appenv.Install(app_src_dir.Dir("dist"), app_artifacts.compact),
+        appenv.Install(app_src_dir.Dir("dist").Dir("debug"), app_artifacts.debug),
     ]
 
 if appenv["FORCE"]:
@@ -207,6 +208,18 @@ Alias(
 )
 Default(install_and_check)
 
+# Compilation database
+
+fwcdb = appenv.CompilationDatabase(
+    app_src_dir.Dir(".vscode").File("compile_commands.json")
+)
+# without filtering, both updater & firmware commands would be generated in same file
+# fwenv.Replace(COMPILATIONDB_PATH_FILTER=appenv.subst("*${FW_FLAVOR}*"))
+AlwaysBuild(fwcdb)
+Precious(fwcdb)
+NoClean(fwcdb)
+Default(fwcdb)
+
 
 # launch_app handler
 
@@ -220,7 +233,7 @@ else:  # more than 1 app - try to find one with matching id
 if app_artifacts:
     appenv.PhonyTarget(
         "launch_app",
-        '${PYTHON3} "${APP_RUN_SCRIPT}" ${SOURCE} --fap_dst_dir "/ext/apps/${FAP_CATEGORY}"',
+        '${PYTHON3} "${APP_RUN_SCRIPT}" "${SOURCE}" --fap_dst_dir "/ext/apps/${FAP_CATEGORY}"',
         source=app_artifacts.compact,
         FAP_CATEGORY=app_artifacts.app.fap_category,
     )

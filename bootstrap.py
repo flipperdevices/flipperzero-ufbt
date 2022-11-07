@@ -223,8 +223,8 @@ def deploy_sdk(target_dir: str, sdk_loader: BaseSdkLoader, hw_target: str):
         BaseSdkLoader.SdkEntry.SDK: ("sdk", None),
         BaseSdkLoader.SdkEntry.SCRIPTS: (".", None),
         BaseSdkLoader.SdkEntry.LIB: ("lib", None),
-        BaseSdkLoader.SdkEntry.FW_ELF: (".", None),
-        BaseSdkLoader.SdkEntry.FW_BIN: (".", None),
+        BaseSdkLoader.SdkEntry.FW_ELF: ("firmware.elf", None),
+        BaseSdkLoader.SdkEntry.FW_BIN: ("firmware.bin", None),
         BaseSdkLoader.SdkEntry.FW_BUNDLE: (
             ".",
             lambda s: os.path.splitext(os.path.basename(s))[0].replace(
@@ -251,15 +251,13 @@ def deploy_sdk(target_dir: str, sdk_loader: BaseSdkLoader, hw_target: str):
             with tarfile.open(sdk_component_path, "r:gz") as tar_file:
                 tar_file.extractall(component_dst_path)
         else:
-            component_dst_path = os.path.join(
-                component_dst_path, os.path.basename(sdk_component_path)
-            )
             shutil.copy2(sdk_component_path, component_dst_path)
 
         if entry_path_converter:
             component_meta_path = entry_path_converter(sdk_component_path)
         else:
             component_meta_path = os.path.relpath(component_dst_path, target_dir)
+
         sdk_state["components"][entry.value] = component_meta_path
 
     with open(os.path.join(target_dir, "sdk_state.json"), "w") as f:
