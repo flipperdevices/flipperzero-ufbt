@@ -4,6 +4,7 @@ targets_help = """Configuration variables:
 tail_help = """
 
 TASKS:
+    (* - not supported yet)
 Building:
     faps:
         Build all FAP apps
@@ -11,22 +12,20 @@ Building:
         Build FAP app with appid={APPID}; upload & start it over USB
 
 Flashing & debugging:
-    flash, flash_blackmagic, jflash:
+    flash, *flash_blackmagic, *jflash:
         Flash firmware to target using debug probe
-    flash_usb, flash_usb_full: 
+    flash_usb, flash_usb_full:
         Install firmware using self-update package
-    debug, debug_other, blackmagic: 
+    debug, debug_other, *blackmagic:
         Start GDB
 
 Other:
-    cli:
+    *cli:
         Open a Flipper CLI session over USB
-    lint, lint_py:
+    *lint, *lint_py:
         run linters
-    format, format_py:
+    *format, *format_py:
         run code formatters
-
-For more targets & info, see documentation/fbt.md
 """
 
 
