@@ -226,6 +226,25 @@ NoClean(fwcdb)
 Default(fwcdb)
 
 
+# launch_app handler
+
+app_artifacts = None
+if len(extapps) == 1:
+    app_artifacts = list(extapps.values())[0]
+elif len(extapps) > 1:  # more than 1 app - try to find one with matching id
+    if appsrc := appenv.subst("$APPID"):
+        app_artifacts = appenv.GetExtAppFromPath(appsrc)
+
+if app_artifacts:
+    appenv.PhonyTarget(
+        "launch_app",
+        '${PYTHON3} "${APP_RUN_SCRIPT}" "${SOURCE}" --fap_dst_dir "/ext/apps/${FAP_CATEGORY}"',
+        source=app_artifacts.compact,
+        FAP_CATEGORY=app_artifacts.app.fap_category,
+    )
+    appenv.Alias("launch_app", app_artifacts.validator)
+
+
 # Prepare vscode environment
 def _get_path_as_posix(path):
     return pathlib.Path(path).as_posix()
@@ -273,36 +292,25 @@ dist_env.Precious(vscode_dist)
 dist_env.NoClean(vscode_dist)
 dist_env.Alias("vscode_dist", vscode_dist)
 
-app_template_dist = dist_env.Install(
-    original_app_dir,
-    dist_env.Glob("#project_template/app_template/*"),
+
+# Creating app from base template
+
+dist_env.SetDefault(FBT_APPID=appenv.subst("$APPID") or "template")
+app_template_dist = []
+for template_file in dist_env.Glob("#project_template/app_template/*"):
+    app_template_dist.append(
+        dist_env.Substfile(
+            original_app_dir.File(dist_env.subst(template_file.name)),
+            template_file,
+            SUBST_DICT={
+                "@FBT_APPID@": dist_env.subst("$FBT_APPID"),
+            },
+        )
+    )
+AddPostAction(
+    app_template_dist[-1],
+    Mkdir(original_app_dir.Dir("images")),
 )
 dist_env.Precious(app_template_dist)
 dist_env.NoClean(app_template_dist)
 dist_env.Alias("app_template", app_template_dist)
-
-#
-
-# dist_env.PhonyTarget(
-#     "get_ufbt_root",
-#     Action(lambda **_: print(Dir("#").abspath), None),
-# )
-
-
-# launch_app handler
-
-app_artifacts = None
-if len(extapps) == 1:
-    app_artifacts = list(extapps.values())[0]
-else:  # more than 1 app - try to find one with matching id
-    if appsrc := appenv.subst("$APPSRC"):
-        app_artifacts = appenv.GetExtAppFromPath(appsrc)
-
-if app_artifacts:
-    appenv.PhonyTarget(
-        "launch_app",
-        '${PYTHON3} "${APP_RUN_SCRIPT}" "${SOURCE}" --fap_dst_dir "/ext/apps/${FAP_CATEGORY}"',
-        source=app_artifacts.compact,
-        FAP_CATEGORY=app_artifacts.app.fap_category,
-    )
-    appenv.Alias("launch_app", app_artifacts.validator)

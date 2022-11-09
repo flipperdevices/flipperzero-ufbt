@@ -59,8 +59,8 @@ vars.AddVariables(
         "auto",
     ),
     (
-        "APPSRC",
-        "Application source directory for app to build & upload",
+        "APPID",
+        "Application id",
         "",
     ),
     PathVariable(
