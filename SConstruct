@@ -238,6 +238,9 @@ for template_file in dist_env.Glob("#project_template/.vscode/*"):
             original_app_dir.Dir(".vscode").File(template_file.name),
             template_file,
             SUBST_DICT={
+                "@UFBT_VSCODE_PATH_SEP@": ";"
+                if dist_env.subst("$PLATFORM") == "win32"
+                else ":",
                 "@UFBT_TOOLCHAIN_ARM_TOOLCHAIN_DIR@": pathlib.Path(
                     dist_env.WhereIs("arm-none-eabi-gcc")
                 ).parent.as_posix(),

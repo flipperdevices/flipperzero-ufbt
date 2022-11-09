@@ -4,7 +4,7 @@
     "version": "2.0.0",
     "options": {
         "env": {
-            "PATH": "${workspaceFolder};${env:PATH};@UFBT_ROOT_DIR@"
+            "PATH": "${workspaceFolder}@UFBT_VSCODE_PATH_SEP@${env:PATH}@UFBT_VSCODE_PATH_SEP@@UFBT_ROOT_DIR@"
         }
     },
     "tasks": [
