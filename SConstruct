@@ -273,6 +273,13 @@ dist_env.Precious(vscode_dist)
 dist_env.NoClean(vscode_dist)
 dist_env.Alias("vscode_dist", vscode_dist)
 
+app_template_dist = dist_env.Install(
+    original_app_dir,
+    dist_env.Glob("#project_template/app_template/*"),
+)
+dist_env.Precious(app_template_dist)
+dist_env.NoClean(app_template_dist)
+dist_env.Alias("app_template", app_template_dist)
 
 #
 

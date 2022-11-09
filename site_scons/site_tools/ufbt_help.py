@@ -8,6 +8,8 @@ TASKS:
 
     vscode_dist:
         Configure application in current directory for development in VSCode.
+    app_template:
+        Copy application template to current directory.
 
 Building:
     faps:
