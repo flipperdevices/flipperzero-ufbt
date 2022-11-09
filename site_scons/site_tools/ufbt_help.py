@@ -5,6 +5,10 @@ tail_help = """
 
 TASKS:
     (* - not supported yet)
+
+    vscode_dist:
+        Configure application in current directory for development in VSCode.
+
 Building:
     faps:
         Build all FAP apps

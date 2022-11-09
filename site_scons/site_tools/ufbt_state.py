@@ -3,6 +3,7 @@ from SCons.Errors import SConsEnvironmentError
 import json
 import os
 import sys
+import pathlib
 from functools import reduce
 
 
@@ -56,9 +57,11 @@ def generate(env, **kw):
         # Paths
         SDK_DEFINITION=env.File(sdk_data["sdk_symbols"][0]),
         UFBT_STATE_DIR=sdk_state_dir_node,
-        FBT_DEBUG_DIR=sdk_state_dir_node.Dir(sdk_components.get("scripts", "."))
-        .Dir("debug")
-        .path.replace("\\", "/"),  # ugly hack for OpenOCD on Windows
+        FBT_DEBUG_DIR=pathlib.Path(
+            sdk_state_dir_node.Dir(sdk_components.get("scripts", "."))
+            .Dir("debug")
+            .abspath
+        ).as_posix(),
         FBT_SCRIPT_DIR=sdk_state_dir_node.Dir(sdk_components.get("scripts", ".")).Dir(
             "scripts"
         ),

@@ -1,7 +1,9 @@
 from SCons.Platform import TempFileMunge
+from SCons.Node import FS
 
 import os
 import multiprocessing
+import pathlib
 
 DefaultEnvironment(tools=[])
 
@@ -9,6 +11,7 @@ EnsurePythonVersion(3, 8)
 
 SetOption("num_jobs", multiprocessing.cpu_count())
 SetOption("max_drift", 1)
+# SetOption("silent", False)
 
 
 ufbt_variables = SConscript("site_scons/commandline.scons")
@@ -108,6 +111,7 @@ dist_env = env.Clone(
         "openocd",
         "blackmagic",
         "jflash",
+        "textfile",
     ],
     ENV=os.environ,
     OPENOCD_OPTS=[
@@ -131,6 +135,7 @@ openocd_target = dist_env.OpenOCDFlash(
     ],
 )
 dist_env.Alias("firmware_flash", openocd_target)
+dist_env.Alias("flash", openocd_target)
 if env["FORCE"]:
     env.AlwaysBuild(openocd_target)
 
@@ -195,7 +200,7 @@ for app in known_extapps:
     ]
 
 if appenv["FORCE"]:
-    appenv.AlwaysBuild(extapp.compact for extapp in extapps.values())
+    appenv.AlwaysBuild([extapp.compact for extapp in extapps.values()])
 
 # Final steps - target aliases
 
@@ -211,7 +216,7 @@ Default(install_and_check)
 # Compilation database
 
 fwcdb = appenv.CompilationDatabase(
-    app_src_dir.Dir(".vscode").File("compile_commands.json")
+    original_app_dir.Dir(".vscode").File("compile_commands.json")
 )
 # without filtering, both updater & firmware commands would be generated in same file
 # fwenv.Replace(COMPILATIONDB_PATH_FILTER=appenv.subst("*${FW_FLAVOR}*"))
@@ -219,6 +224,59 @@ AlwaysBuild(fwcdb)
 Precious(fwcdb)
 NoClean(fwcdb)
 Default(fwcdb)
+
+
+# Prepare vscode environment
+def _get_path_as_posix(path):
+    return pathlib.Path(path).as_posix()
+
+
+vscode_dist = []
+for template_file in dist_env.Glob("#project_template/.vscode/*"):
+    vscode_dist.append(
+        dist_env.Substfile(
+            original_app_dir.Dir(".vscode").File(template_file.name),
+            template_file,
+            SUBST_DICT={
+                "@UFBT_TOOLCHAIN_ARM_TOOLCHAIN_DIR@": pathlib.Path(
+                    dist_env.WhereIs("arm-none-eabi-gcc")
+                ).parent.as_posix(),
+                "@UFBT_TOOLCHAIN_GCC@": _get_path_as_posix(
+                    dist_env.WhereIs("arm-none-eabi-gcc")
+                ),
+                "@UFBT_TOOLCHAIN_GDB_PY@": _get_path_as_posix(
+                    dist_env.WhereIs("arm-none-eabi-gdb-py")
+                ),
+                "@UFBT_TOOLCHAIN_OPENOCD@": _get_path_as_posix(
+                    dist_env.WhereIs("openocd")
+                ),
+                "@UFBT_APP_DIR@": _get_path_as_posix(original_app_dir.abspath),
+                "@UFBT_ROOT_DIR@": _get_path_as_posix(Dir("#").abspath),
+                "@UFBT_DEBUG_DIR@": dist_env["FBT_DEBUG_DIR"],
+                "@UFBT_DEBUG_ELF_DIR@": _get_path_as_posix(
+                    dist_env["FBT_FAP_DEBUG_ELF_ROOT"].abspath
+                ),
+                "@UFBT_FIRMWARE_ELF@": _get_path_as_posix(dist_env["FW_ELF"].abspath),
+            },
+        )
+    )
+
+for config_file in dist_env.Glob("#/project_template/.*"):
+    if isinstance(config_file, FS.Dir):
+        continue
+    vscode_dist.append(dist_env.Install(original_app_dir, config_file))
+
+dist_env.Precious(vscode_dist)
+dist_env.NoClean(vscode_dist)
+dist_env.Alias("vscode_dist", vscode_dist)
+
+
+#
+
+# dist_env.PhonyTarget(
+#     "get_ufbt_root",
+#     Action(lambda **_: print(Dir("#").abspath), None),
+# )
 
 
 # launch_app handler
