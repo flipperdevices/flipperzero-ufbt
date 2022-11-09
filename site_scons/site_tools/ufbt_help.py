@@ -26,7 +26,7 @@ Flashing & debugging:
         Start GDB
 
 Other:
-    *cli:
+    cli:
         Open a Flipper CLI session over USB
     *lint, *lint_py:
         run linters

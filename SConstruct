@@ -244,6 +244,13 @@ if app_artifacts:
     )
     appenv.Alias("launch_app", app_artifacts.validator)
 
+# cli handler
+
+appenv.PhonyTarget(
+    "cli",
+    '${PYTHON3} "${FBT_SCRIPT_DIR}/serial_cli.py"',
+)
+
 
 # Prepare vscode environment
 def _get_path_as_posix(path):
