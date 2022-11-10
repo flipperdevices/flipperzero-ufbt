@@ -2,38 +2,38 @@
 
 uFBT is a tool for building applications for Flipper Zero. It is a simplified version of [Flipper Build Tool (FBT)](https://github.com/flipperdevices/flipperzero-firmware/blob/dev/documentation/fbt.md). 
 
-uFBT allows you to perform basic development tasks for Flipper Zero, like building and debugging applications, flashing the firmware. It uses prebuilt binaries and libraries, so you don't need to build the whole firmware to build your application.
+uFBT allows you to perform basic development tasks for Flipper Zero, like building and debugging applications, flashing firmware. It uses prebuilt binaries and libraries, so you don't need to build the whole firmware to compile and debug your application.
 
 
 ## Installation
 
-Clone this repository and add its path to your `PATH` environment variable. On first run, uFBT will download and install all required SDK dependencies from `dev` branch of official firmware.
+Clone this repository and add its path to your `PATH` environment variable. On first run, uFBT will download and install all required SDK components from `dev` branch of official firmware.
 
 ### Updating the SDK
 
-To update the SDK, run `ufbt update`. This will download and install all required SDK dependencies from previously used channel or branch.
+To update the SDK, run `ufbt update`. This will download and install all required SDK components from previously used channel or branch.
 
 To switch to a different version of the SDK, run `ufbt update --channel=[dev|rc|release]`. Or you can use any not-yet-merged branch from official repo, like `ufbt update --branch=feature/my-awesome-feature`.
 
-If something goes wrong and uFBT state becomes corrupted, you can reset it by running `ufbt purge`. If that doesn't work, you can try to remove `.ufbt` directory manually from ufbt's folder.
+If something goes wrong and uFBT state becomes corrupted, you can reset it by running `ufbt purge`. If that doesn't work, you can try removing `.ufbt` subfolder manually from ufbt's folder.
 
 ## Usage
 
 ### Building & running your application
 
-Run `ufbt` in the root directory of your application. It will build your application and place the resulting binary in the `dist` directory.
+Run `ufbt` in the root directory of your application. It will build your application and place the resulting binary in `dist` subdirectory.
 
-You can upload and start your application on the device using `ufbt launch`.
+You can upload and start your application on Flipper attached over  USB using `ufbt launch_app`.
 
 ### Debugging
 
-In order to debug your application, you need to be running the firmware distributed alongside with current SDK version. You can flash it to your Flipper Zero using `ufbt flash` (over ST-Link), `ufbt flash_usb` (over USB) or `ufbt flash_blackmagic` (using Wi-Fi dev board running Blackmagic firmware).
+In order to debug your application, you need to be running the firmware distributed alongside with current SDK version. You can flash it to your Flipper using `ufbt flash` (over ST-Link), `ufbt flash_usb` (over USB) or `ufbt flash_blackmagic` (using Wi-Fi dev board running Blackmagic firmware).
 
 You can attach to running firmware using `ufbt debug` (for ST-Link) or `ufbt blackmagic` (for Wi-Fi dev board).
 
 ### VSCode integration
 
-uFBT provides a configuration for VSCode that allows you to build and debug your application directly from the IDE. To use it, run `ufbt vscode_dist` in the root directory of your application. Then you can open the project in VSCode (`File`-`Open Folder...`) and use the provided launch (`ctrl+shift+b`) & debugging (`ctrl+shift+d`) configurations.
+uFBT provides a configuration for VSCode that allows you to build and debug your application directly from the IDE. To deploy it, run `ufbt vscode_dist` in the root directory of your application. Then you can open the project in VSCode (`File`-`Open Folder...`) and use the provided launch (`ctrl+shift+b`) & debugging (`ctrl+shift+d`) configurations.
 
 ### Application template
 
