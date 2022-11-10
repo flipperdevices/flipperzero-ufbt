@@ -35,10 +35,12 @@ def _load_sdk_data(sdk_root):
 
 
 def generate(env, **kw):
-    sdk_state_dir = kw.get("SDK_STATE_DIR", ".ufbt/current")
+    ufbt_work_dir = env.Dir(kw.get("UFBT_WORK_DIR", ".ufbt"))
     sdk_meta_filename = kw.get("SDK_META", "sdk_state.json")
 
-    sdk_meta_path = os.path.join(sdk_state_dir, sdk_meta_filename)
+    sdk_state_dir_node = ufbt_work_dir.Dir("current")
+
+    sdk_meta_path = os.path.join(sdk_state_dir_node.abspath, sdk_meta_filename)
     if not os.path.exists(sdk_meta_path):
         raise SConsEnvironmentError(f"SDK state file {sdk_meta_path} not found")
 
@@ -48,12 +50,13 @@ def generate(env, **kw):
     if not (sdk_components := sdk_state.get("components", {})):
         raise SConsEnvironmentError("SDK state file doesn't contain components data")
 
-    sdk_options_path = os.path.join(sdk_state_dir, sdk_components.get("sdk", "sdk"))
+    sdk_options_path = os.path.join(
+        sdk_state_dir_node.abspath, sdk_components.get("sdk", "sdk")
+    )
     sdk_data = _load_sdk_data(sdk_options_path)
     if not sdk_state["meta"]["hw_target"].endswith(sdk_data["hardware"]):
         raise SConsEnvironmentError("SDK state file doesn't match hardware target")
 
-    sdk_state_dir_node = env.Dir(sdk_state_dir)
     env.SetDefault(
         # Paths
         SDK_DEFINITION=env.File(sdk_data["sdk_symbols"][0]),
@@ -79,6 +82,11 @@ def generate(env, **kw):
         CXXFLAGS_APP=sdk_data["cpp_args"],
         LINKFLAGS_APP=sdk_data["linker_args"],
         LIBS=sdk_data["linker_libs"],
+        # ufbt state
+        UFBT_WORK_DIR=ufbt_work_dir,
+        UFBT_SDK_DIR=sdk_state_dir_node,
+        UFBT_SDK_META=sdk_state["meta"],
+        UFBT_BOOTSTRAP_SCRIPT=env.File("#/bootstrap.py"),
     )
 
     sys.path.insert(0, env["FBT_SCRIPT_DIR"].abspath)

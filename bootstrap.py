@@ -137,6 +137,7 @@ class BranchSdkLoader(BaseSdkLoader):
 
     def get_metadata(self):
         return {
+            "mode": "branch",
             "branch": self._branch,
             "version": self._version,
         }
@@ -173,7 +174,8 @@ class UpdateChannelSdkLoader(BaseSdkLoader):
 
     def get_metadata(self):
         return {
-            "channel": self.channel.value,
+            "mode": "channel",
+            "channel": self.channel.name.lower(),
             "version": self.version_info["version"],
         }
 
@@ -276,7 +278,12 @@ def main():
         "--channel",
         "-c",
         help="Update channel to use",
-        choices=UpdateChannelSdkLoader.UpdateChannel.__members__.keys(),
+        choices=list(
+            map(
+                lambda s: s.lower(),
+                UpdateChannelSdkLoader.UpdateChannel.__members__.keys(),
+            )
+        ),
     )
     parser.add_argument(
         "--hw-target",
@@ -303,7 +310,8 @@ def main():
         sdk_loader = BranchSdkLoader(args.branch, ufbt_download_dir)
     elif args.channel:
         sdk_loader = UpdateChannelSdkLoader(
-            UpdateChannelSdkLoader.UpdateChannel[args.channel], ufbt_download_dir
+            UpdateChannelSdkLoader.UpdateChannel[args.channel.upper()],
+            ufbt_download_dir,
         )
     else:
         parser.error("One of --branch or --channel must be specified")

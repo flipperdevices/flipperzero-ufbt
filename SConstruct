@@ -5,6 +5,7 @@ import os
 import multiprocessing
 import pathlib
 
+
 DefaultEnvironment(tools=[])
 
 EnsurePythonVersion(3, 8)
@@ -53,6 +54,13 @@ core_env = Environment(
         ("ufbt_help", {"vars": ufbt_variables}),
     ],
 )
+
+
+if GetOption("ufbt_update"):
+    SConscript(
+        "site_scons/update.scons",
+        exports={"core_env": core_env},
+    )
 
 # Now we can import stuff bundled with SDK - it was added to sys.path by ufbt_state
 
@@ -247,7 +255,8 @@ fwcdb = appenv.CompilationDatabase(
 AlwaysBuild(fwcdb)
 Precious(fwcdb)
 NoClean(fwcdb)
-Default(fwcdb)
+if len(extapps):
+    Default(fwcdb)
 
 
 # launch_app handler
