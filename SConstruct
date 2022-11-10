@@ -62,6 +62,7 @@ from fbt.util import (
     extract_abs_dir,
     extract_abs_dir_path,
     wrap_tempfile,
+    path_as_posix,
 )
 from fbt.appmanifest import FlipperAppType
 
@@ -145,7 +146,30 @@ firmware_debug = dist_env.PhonyTarget(
     source=dist_env["FW_ELF"],
     GDBOPTS="${GDBOPTS_BASE}",
     GDBREMOTE="${OPENOCD_GDB_PIPE}",
-    FBT_FAP_DEBUG_ELF_ROOT=env["FW_ELF"],
+    FBT_FAP_DEBUG_ELF_ROOT=path_as_posix(dist_env.subst("$FBT_FAP_DEBUG_ELF_ROOT")),
+)
+
+dist_env.PhonyTarget(
+    "blackmagic",
+    "${GDBPYCOM}",
+    source=dist_env["FW_ELF"],
+    GDBOPTS="${GDBOPTS_BASE} ${GDBOPTS_BLACKMAGIC}",
+    GDBREMOTE="${BLACKMAGIC_ADDR}",
+    FBT_FAP_DEBUG_ELF_ROOT=path_as_posix(dist_env.subst("$FBT_FAP_DEBUG_ELF_ROOT")),
+)
+
+dist_env.PhonyTarget(
+    "flash_blackmagic",
+    "$GDB $GDBOPTS $SOURCES $GDBFLASH",
+    source=dist_env["FW_ELF"],
+    GDBOPTS="${GDBOPTS_BASE} ${GDBOPTS_BLACKMAGIC}",
+    GDBREMOTE="${BLACKMAGIC_ADDR}",
+    GDBFLASH=[
+        "-ex",
+        "load",
+        "-ex",
+        "quit",
+    ],
 )
 
 flash_usb_full = dist_env.UsbInstall(
@@ -253,7 +277,7 @@ appenv.PhonyTarget(
 
 
 # Prepare vscode environment
-def _get_path_as_posix(path):
+def _path_as_posix(path):
     return pathlib.Path(path).as_posix()
 
 
@@ -264,28 +288,24 @@ for template_file in dist_env.Glob("#project_template/.vscode/*"):
             original_app_dir.Dir(".vscode").File(template_file.name),
             template_file,
             SUBST_DICT={
-                "@UFBT_VSCODE_PATH_SEP@": ";"
-                if dist_env.subst("$PLATFORM") == "win32"
-                else ":",
+                "@UFBT_VSCODE_PATH_SEP@": os.path.pathsep,
                 "@UFBT_TOOLCHAIN_ARM_TOOLCHAIN_DIR@": pathlib.Path(
                     dist_env.WhereIs("arm-none-eabi-gcc")
                 ).parent.as_posix(),
-                "@UFBT_TOOLCHAIN_GCC@": _get_path_as_posix(
+                "@UFBT_TOOLCHAIN_GCC@": _path_as_posix(
                     dist_env.WhereIs("arm-none-eabi-gcc")
                 ),
-                "@UFBT_TOOLCHAIN_GDB_PY@": _get_path_as_posix(
+                "@UFBT_TOOLCHAIN_GDB_PY@": _path_as_posix(
                     dist_env.WhereIs("arm-none-eabi-gdb-py")
                 ),
-                "@UFBT_TOOLCHAIN_OPENOCD@": _get_path_as_posix(
-                    dist_env.WhereIs("openocd")
-                ),
-                "@UFBT_APP_DIR@": _get_path_as_posix(original_app_dir.abspath),
-                "@UFBT_ROOT_DIR@": _get_path_as_posix(Dir("#").abspath),
+                "@UFBT_TOOLCHAIN_OPENOCD@": _path_as_posix(dist_env.WhereIs("openocd")),
+                "@UFBT_APP_DIR@": _path_as_posix(original_app_dir.abspath),
+                "@UFBT_ROOT_DIR@": _path_as_posix(Dir("#").abspath),
                 "@UFBT_DEBUG_DIR@": dist_env["FBT_DEBUG_DIR"],
-                "@UFBT_DEBUG_ELF_DIR@": _get_path_as_posix(
+                "@UFBT_DEBUG_ELF_DIR@": _path_as_posix(
                     dist_env["FBT_FAP_DEBUG_ELF_ROOT"].abspath
                 ),
-                "@UFBT_FIRMWARE_ELF@": _get_path_as_posix(dist_env["FW_ELF"].abspath),
+                "@UFBT_FIRMWARE_ELF@": _path_as_posix(dist_env["FW_ELF"].abspath),
             },
         )
     )

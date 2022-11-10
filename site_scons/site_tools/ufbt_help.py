@@ -18,11 +18,11 @@ Building:
         Build FAP app with appid={APPID}; upload & start it over USB
 
 Flashing & debugging:
-    flash, *flash_blackmagic, *jflash:
+    flash, flash_blackmagic, *jflash:
         Flash firmware to target using debug probe
     flash_usb, flash_usb_full:
         Install firmware using self-update package
-    debug, debug_other, *blackmagic:
+    debug, debug_other, blackmagic:
         Start GDB
 
 Other:

@@ -14,6 +14,7 @@ def _load_sdk_data(sdk_root):
         replacements = {
             sdk_json_data["app_ep_subst"]: "${APP_ENTRY}",
             sdk_json_data["sdk_path_subst"]: sdk_root.replace("\\", "/"),
+            sdk_json_data["map_file_subst"]: "${TARGET}",
         }
 
         for key, value in sdk_json_data.items():
@@ -69,6 +70,7 @@ def generate(env, **kw):
         FW_ELF=sdk_state_dir_node.File(sdk_components.get("fwelf")),
         FW_BIN=sdk_state_dir_node.File(sdk_components.get("fwbin")),
         UPDATE_BUNDLE_DIR=sdk_state_dir_node.Dir(sdk_components.get("fwbundle")),
+        SVD_FILE="${FBT_DEBUG_DIR}/STM32WB55_CM4.svd",
         # Build variables
         ROOT_DIR=env.Dir("#"),
         FIRMWARE_BUILD_CFG="firmware",

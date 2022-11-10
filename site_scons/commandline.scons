@@ -32,12 +32,6 @@ vars.AddVariables(
     #     default=False,
     # ),
     PathVariable(
-        "SVD_FILE",
-        help="Path to SVD file",
-        validator=PathVariable.PathAccept,  # PathVariable.PathIsFile,
-        default="",
-    ),
-    PathVariable(
         "OTHER_ELF",
         help="Path to prebuilt ELF file to debug",
         validator=PathVariable.PathAccept,
