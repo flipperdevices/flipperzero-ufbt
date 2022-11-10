@@ -349,4 +349,4 @@ AddPostAction(
 )
 dist_env.Precious(app_template_dist)
 dist_env.NoClean(app_template_dist)
-dist_env.Alias("app_template", app_template_dist)
+dist_env.Alias("create_app", app_template_dist)
