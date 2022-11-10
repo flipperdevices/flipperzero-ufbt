@@ -3,6 +3,7 @@ import enum
 import json
 import re
 import shutil
+import ssl
 import tarfile
 import argparse
 
@@ -86,7 +87,9 @@ class BaseSdkLoader:
 
         os.makedirs(self._download_dir, exist_ok=True)
 
-        with urlopen(url) as response, open(file_path, "wb") as out_file:
+        with urlopen(url, context=ssl._create_unverified_context()) as response, open(
+            file_path, "wb"
+        ) as out_file:
             data = response.read()
             out_file.write(data)
 
@@ -127,7 +130,9 @@ class BranchSdkLoader(BaseSdkLoader):
     def _fetch_branch(self):
         # Fetch html index page with links to files
         log.info(f"Fetching branch index {self._branch_url}")
-        with urlopen(self._branch_url) as response:
+        with urlopen(
+            self._branch_url, context=ssl._create_unverified_context()
+        ) as response:
             html = response.read().decode("utf-8")
             extractor = BranchSdkLoader.LinkExtractor()
             extractor.feed(html)
