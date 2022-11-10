@@ -13,5 +13,8 @@
         "*.fam": "python"
     },
     "cortex-debug.registerUseNaturalFormat": false,
-    "python.analysis.typeCheckingMode": "off"
+    "python.analysis.typeCheckingMode": "off",
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter"
+    }
 }
