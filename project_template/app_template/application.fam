@@ -9,7 +9,7 @@ App(
     fap_category="Misc",
     # Optional values
     # fap_version=(0, 1),  # (major, minor)
-    # fap_icon="@FBT_APPID@.png",  # 10x10 1-bit PNG
+    fap_icon="@FBT_APPID@.png",  # 10x10 1-bit PNG
     # fap_description="A simple app",
     # fap_author="J. Doe",
     # fap_weburl="https://github.com/user/@FBT_APPID@",
