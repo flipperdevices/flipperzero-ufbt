@@ -6,14 +6,6 @@ AddOption(
     help="Comma-separated list of additional environment variables to pass to child SCons processes",
 )
 
-AddOption(
-    "--update",
-    action="store_true",
-    dest="ufbt_update",
-    default=False,
-    help="Update SDK from currently selected source",
-)
-
 # AddOption(
 #     "--target",
 #     action="store",

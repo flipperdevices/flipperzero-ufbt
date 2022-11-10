@@ -56,11 +56,16 @@ core_env = Environment(
 )
 
 
-if GetOption("ufbt_update"):
+if "update" in BUILD_TARGETS:
     SConscript(
         "site_scons/update.scons",
         exports={"core_env": core_env},
     )
+
+if "purge" in BUILD_TARGETS:
+    core_env.Execute(Delete(".ufbt"))
+    print("uFBT state purged")
+    Exit(0)
 
 # Now we can import stuff bundled with SDK - it was added to sys.path by ufbt_state
 

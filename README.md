@@ -11,10 +11,11 @@ Clone this repository and add its path to your `PATH` environment variable. On f
 
 ### Updating the SDK
 
-To update the SDK, run `ufbt --update`. This will download and install all required SDK dependencies from previously used channel or branch.
+To update the SDK, run `ufbt update`. This will download and install all required SDK dependencies from previously used channel or branch.
 
-To switch to a different version of the SDK, run `ufbt --update --channel=[dev|rc|release]`. Or you can use any not-yet-merged branch from official repo, like `ufbt --update --branch=feature/my-awesome-feature`.
+To switch to a different version of the SDK, run `ufbt update --channel=[dev|rc|release]`. Or you can use any not-yet-merged branch from official repo, like `ufbt update --branch=feature/my-awesome-feature`.
 
+If something goes wrong and uFBT state becomes corrupted, you can reset it by running `ufbt purge`. If that doesn't work, you can try to remove `.ufbt` directory manually from ufbt's folder.
 
 ## Usage
 
