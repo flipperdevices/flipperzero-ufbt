@@ -2,7 +2,6 @@ from SCons.Platform import TempFileMunge
 from SCons.Node import FS
 
 import os
-import shutil
 import multiprocessing
 import pathlib
 
