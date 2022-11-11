@@ -23,7 +23,7 @@ If something goes wrong and uFBT state becomes corrupted, you can reset it by ru
 
 Run `ufbt` in the root directory of your application. It will build your application and place the resulting binary in `dist` subdirectory.
 
-You can upload and start your application on Flipper attached over  USB using `ufbt launch_app`.
+You can upload and start your application on Flipper attached over  USB using `ufbt launch`.
 
 ### Debugging
 
@@ -37,7 +37,7 @@ uFBT provides a configuration for VSCode that allows you to build and debug your
 
 ### Application template
 
-uFBT can create a template for your application. To do this, run `ufbt create_app APPID=<app_id>` in the directory where you want to create your application. It will create an application manifest and its main source file. You can then build and debug your application using the instructions above.
+uFBT can create a template for your application. To do this, run `ufbt create APPID=<app_id>` in the directory where you want to create your application. It will create an application manifest and its main source file. You can then build and debug your application using the instructions above.
 Application manifests are explained in the [FBT documentation](https://github.com/flipperdevices/flipperzero-firmware/blob/dev/documentation/AppManifests.md).
 
 ### Other

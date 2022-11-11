@@ -12,7 +12,7 @@
             "label": "Launch App on Flipper",
             "group": "build",
             "type": "shell",
-            "command": "ufbt launch_app"
+            "command": "ufbt launch"
         },
         {
             "label": "Build",
@@ -24,7 +24,7 @@
             "label": "Flash FW (ST-Link)",
             "group": "build",
             "type": "shell",
-            "command": "ufbt flash"
+            "command": "ufbt FORCE=1 flash"
         },
         // {
         //     "label": "[NOTIMPL] Flash FW (blackmagic)",

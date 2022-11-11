@@ -264,7 +264,7 @@ if len(extapps):
     Default(fwcdb)
 
 
-# launch_app handler
+# launch handler
 
 app_artifacts = None
 if len(extapps) == 1:
@@ -275,12 +275,12 @@ elif len(extapps) > 1:  # more than 1 app - try to find one with matching id
 
 if app_artifacts:
     appenv.PhonyTarget(
-        "launch_app",
+        "launch",
         '${PYTHON3} "${APP_RUN_SCRIPT}" "${SOURCE}" --fap_dst_dir "/ext/apps/${FAP_CATEGORY}"',
         source=app_artifacts.compact,
         FAP_CATEGORY=app_artifacts.app.fap_category,
     )
-    appenv.Alias("launch_app", app_artifacts.validator)
+    appenv.Alias("launch", app_artifacts.validator)
 
 # cli handler
 
@@ -354,4 +354,4 @@ AddPostAction(
 )
 dist_env.Precious(app_template_dist)
 dist_env.NoClean(app_template_dist)
-dist_env.Alias("create_app", app_template_dist)
+dist_env.Alias("create", app_template_dist)
