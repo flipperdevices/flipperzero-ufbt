@@ -340,25 +340,21 @@ dist_env.Alias("vscode_dist", vscode_dist)
 dist_env.SetDefault(FBT_APPID=appenv.subst("$APPID") or "template")
 app_template_dist = []
 for template_file in dist_env.Glob("#project_template/app_template/*"):
-    if template_file.name[-4:] == '.png':
-        app_image = dist_env.Substfile(
-            original_app_dir.File(dist_env.subst(template_file.name)),
-            template_file,
-            SUBST_DICT={
-                "@FBT_APPID@": dist_env.subst("$FBT_APPID"),
-            },
-        ).pop()
-        shutil.copy(template_file.abspath, app_image.abspath)
-        continue
-    app_template_dist.append(
-        dist_env.Substfile(
-            original_app_dir.File(dist_env.subst(template_file.name)),
-            template_file,
-            SUBST_DICT={
-                "@FBT_APPID@": dist_env.subst("$FBT_APPID"),
-            },
+    dist_file_name = dist_env.subst(template_file.name)
+    if template_file.name.endswith(".png"):
+        app_template_dist.append(
+            dist_env.InstallAs(original_app_dir.File(dist_file_name), template_file)
         )
-    )
+    else:
+        app_template_dist.append(
+            dist_env.Substfile(
+                original_app_dir.File(dist_file_name),
+                template_file,
+                SUBST_DICT={
+                    "@FBT_APPID@": dist_env.subst("$FBT_APPID"),
+                },
+            )
+        )
 AddPostAction(
     app_template_dist[-1],
     Mkdir(original_app_dir.Dir("images")),
