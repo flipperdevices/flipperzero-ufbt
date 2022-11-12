@@ -21,7 +21,7 @@ If something goes wrong and uFBT state becomes corrupted, you can reset it by ru
 
 ### Building & running your application
 
-Run `ufbt` in the root directory of your application. It will build your application and place the resulting binary in `dist` subdirectory.
+Run `ufbt` in the root directory of your application (the one with `application.fam` file in it). It will build your application and place the resulting binary in `dist` subdirectory.
 
 You can upload and start your application on Flipper attached over  USB using `ufbt launch`.
 
