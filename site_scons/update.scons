@@ -25,6 +25,6 @@ else:
 
 update_env.Replace(UPDATE_ARGS=update_args)
 result = update_env.Execute(
-    update_env.subst("$PYTHON3 $UFBT_BOOTSTRAP_SCRIPT $UPDATE_ARGS"),
+    update_env.subst('$PYTHON3 "$UFBT_BOOTSTRAP_SCRIPT" $UPDATE_ARGS'),
 )
 Exit(result)
