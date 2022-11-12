@@ -25,6 +25,11 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
+# Temporary fix for SSL negotiation failure on Mac
+_ssl_context = ssl.create_default_context()
+_ssl_context.check_hostname = False
+_ssl_context.verify_mode = ssl.CERT_NONE
+
 
 class FileType(enum.Enum):
     SDK_ZIP = "sdk_zip"
@@ -87,7 +92,7 @@ class BaseSdkLoader:
 
         os.makedirs(self._download_dir, exist_ok=True)
 
-        with urlopen(url, context=ssl.SSLContext()) as response, open(
+        with urlopen(url, context=_ssl_context) as response, open(
             file_path, "wb"
         ) as out_file:
             data = response.read()
@@ -98,7 +103,7 @@ class BaseSdkLoader:
 
 class BranchSdkLoader(BaseSdkLoader):
     class LinkExtractor(HTMLParser):
-        FILE_NAME_RE = re.compile(r"flipper-z-(\w+)-(\w+)-([^\.]+)\.(\w+)")
+        FILE_NAME_RE = re.compile(r"flipper-z-(\w+)-(\w+)-(.+)\.(\w+)")
 
         def reset(self):
             super().reset()
@@ -107,6 +112,9 @@ class BranchSdkLoader(BaseSdkLoader):
 
         def handle_starttag(self, tag, attrs):
             if tag == "a" and (href := dict(attrs).get("href", None)):
+                # .map files have special naming and we don't need them
+                if ".map" in href:
+                    return
                 if match := self.FILE_NAME_RE.match(href):
                     target, file_type, version, ext = match.groups()
                     file_type_str = f"{file_type}_{ext}".upper()
@@ -130,7 +138,7 @@ class BranchSdkLoader(BaseSdkLoader):
     def _fetch_branch(self):
         # Fetch html index page with links to files
         log.info(f"Fetching branch index {self._branch_url}")
-        with urlopen(self._branch_url, context=ssl.SSLContext()) as response:
+        with urlopen(self._branch_url, context=_ssl_context) as response:
             html = response.read().decode("utf-8")
             extractor = BranchSdkLoader.LinkExtractor()
             extractor.feed(html)
@@ -186,7 +194,7 @@ class UpdateChannelSdkLoader(BaseSdkLoader):
     def _fetch_version(channel: UpdateChannel):
         log.info(f"Fetching version info for {channel}")
         url = "https://update.flipperzero.one/firmware/directory.json"
-        data = json.loads(urlopen(url, context=ssl.SSLContext()).read().decode("utf-8"))
+        data = json.loads(urlopen(url, context=_ssl_context).read().decode("utf-8"))
 
         channels = data.get("channels", [])
         if not channels:
