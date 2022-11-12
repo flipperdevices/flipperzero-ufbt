@@ -42,4 +42,5 @@ Application manifests are explained in the [FBT documentation](https://github.co
 
 ### Other
 
-`ufbt cli` starts a CLI session with the device.
+ * `ufbt cli` starts a CLI session with the device;
+ * `ufbt lint`, `ufbt format` run clang-format on application's sources.

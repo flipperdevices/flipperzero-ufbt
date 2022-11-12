@@ -298,12 +298,14 @@ appenv.PhonyTarget(
 dist_env.PhonyTarget(
     "lint",
     "${PYTHON3} ${FBT_SCRIPT_DIR}/lint.py check ${LINT_SOURCES}",
+    source=original_app_dir.File(".clang-format"),
     LINT_SOURCES=[original_app_dir],
 )
 
 dist_env.PhonyTarget(
     "format",
     "${PYTHON3} ${FBT_SCRIPT_DIR}/lint.py format ${LINT_SOURCES}",
+    source=original_app_dir.File(".clang-format"),
     LINT_SOURCES=[original_app_dir],
 )
 
