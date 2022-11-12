@@ -35,7 +35,7 @@ def _load_sdk_data(sdk_root):
 
 
 def generate(env, **kw):
-    ufbt_work_dir = env.Dir(kw.get("UFBT_WORK_DIR", ".ufbt"))
+    ufbt_work_dir = env.Dir(kw.get("UFBT_WORK_DIR", "#.ufbt"))
     sdk_meta_filename = kw.get("SDK_META", "sdk_state.json")
 
     sdk_state_dir_node = ufbt_work_dir.Dir("current")

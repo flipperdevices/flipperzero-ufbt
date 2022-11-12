@@ -289,6 +289,20 @@ appenv.PhonyTarget(
     '${PYTHON3} "${FBT_SCRIPT_DIR}/serial_cli.py"',
 )
 
+# Linter
+
+dist_env.PhonyTarget(
+    "lint",
+    "${PYTHON3} ${FBT_SCRIPT_DIR}/lint.py check ${LINT_SOURCES}",
+    LINT_SOURCES=[original_app_dir],
+)
+
+dist_env.PhonyTarget(
+    "format",
+    "${PYTHON3} ${FBT_SCRIPT_DIR}/lint.py format ${LINT_SOURCES}",
+    LINT_SOURCES=[original_app_dir],
+)
+
 
 # Prepare vscode environment
 def _path_as_posix(path):
