@@ -8,6 +8,15 @@ from functools import reduce
 
 
 def _load_sdk_data(sdk_root):
+    split_vars = {
+        "cc_args",
+        "cpp_args",
+        "linker_args",
+        "linker_libs",
+    }
+    subst_vars = split_vars | {
+        "sdk_symbols",
+    }
     sdk_data = {}
     with open(os.path.join(sdk_root, "sdk.opts")) as f:
         sdk_json_data = json.load(f)
@@ -17,19 +26,22 @@ def _load_sdk_data(sdk_root):
             sdk_json_data["map_file_subst"]: "${TARGET}",
         }
 
-        for key, value in sdk_json_data.items():
-            if key in (
-                "cc_args",
-                "cpp_args",
-                "linker_args",
-                "linker_libs",
-                "sdk_symbols",
-            ):
-                sdk_data[key] = reduce(
-                    lambda a, kv: a.replace(*kv), replacements.items(), value
-                ).split(" ")
+        def do_value_substs(src_value):
+            if isinstance(src_value, str):
+                return reduce(
+                    lambda acc, kv: acc.replace(*kv), replacements.items(), src_value
+                )
+            elif isinstance(src_value, list):
+                return [do_value_substs(v) for v in src_value]
             else:
-                sdk_data[key] = value
+                return src_value
+
+        for key, value in sdk_json_data.items():
+            if key in split_vars:
+                value = value.split()
+            if key in subst_vars:
+                value = do_value_substs(value)
+            sdk_data[key] = value
 
     return sdk_data
 
@@ -59,7 +71,7 @@ def generate(env, **kw):
 
     env.SetDefault(
         # Paths
-        SDK_DEFINITION=env.File(sdk_data["sdk_symbols"][0]),
+        SDK_DEFINITION=env.File(sdk_data["sdk_symbols"]),
         UFBT_STATE_DIR=sdk_state_dir_node,
         FBT_DEBUG_DIR=pathlib.Path(
             sdk_state_dir_node.Dir(sdk_components.get("scripts", "."))
