@@ -78,6 +78,7 @@ from fbt.util import (
     path_as_posix,
 )
 from fbt.appmanifest import FlipperAppType
+from fbt.sdk.cache import SdkCache
 
 # Base environment with all tools loaded from SDK
 env = core_env.Clone(
@@ -109,6 +110,10 @@ env = core_env.Clone(
     SINGLEQUOTEFUNC=single_quote,
     ABSPATHGETTERFUNC=extract_abs_dir_path,
     APPS=[],
+    UFBT_API_VERSION=SdkCache(
+        core_env.subst("$SDK_DEFINITION"), load_version_only=True
+    ).version,
+    APPCHECK_COMSTR="\tAPPCHK\t${SOURCE}\n\t\tAPI: ${UFBT_API_VERSION}",
 )
 
 wrap_tempfile(env, "LINKCOM")
@@ -255,8 +260,7 @@ Default(install_and_check)
 fwcdb = appenv.CompilationDatabase(
     original_app_dir.Dir(".vscode").File("compile_commands.json")
 )
-# without filtering, both updater & firmware commands would be generated in same file
-# fwenv.Replace(COMPILATIONDB_PATH_FILTER=appenv.subst("*${FW_FLAVOR}*"))
+
 AlwaysBuild(fwcdb)
 Precious(fwcdb)
 NoClean(fwcdb)
