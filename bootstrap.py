@@ -231,7 +231,9 @@ class UpdateChannelSdkLoader(BaseSdkLoader):
         return file_info
 
 
-def deploy_sdk(target_dir: str, sdk_loader: BaseSdkLoader, hw_target: str):
+def deploy_sdk(target_dir: str, sdk_loader: BaseSdkLoader, hw_target: str, force: bool):
+    SDK_STATE_FILE_NAME = "sdk_state.json"
+
     sdk_layout = {
         BaseSdkLoader.SdkEntry.SDK: ("sdk", None),
         BaseSdkLoader.SdkEntry.SCRIPTS: (".", None),
@@ -247,6 +249,17 @@ def deploy_sdk(target_dir: str, sdk_loader: BaseSdkLoader, hw_target: str):
     }
 
     log.info(f"uFBT state dir: {target_dir}")
+    if not force and os.path.exists(target_dir):
+        # Read existing state
+        with open(os.path.join(target_dir, SDK_STATE_FILE_NAME), "r") as f:
+            sdk_state = json.load(f)
+        # Check if we need to update
+        if sdk_state.get("meta", {}).get("version") == sdk_loader.get_metadata().get(
+            "version"
+        ):
+            log.info("SDK is up-to-date")
+            return
+
     shutil.rmtree(target_dir, ignore_errors=True)
 
     sdk_state = {
@@ -273,7 +286,10 @@ def deploy_sdk(target_dir: str, sdk_loader: BaseSdkLoader, hw_target: str):
 
         sdk_state["components"][entry.value] = component_meta_path
 
-    with open(os.path.join(target_dir, "sdk_state.json"), "w") as f:
+    with open(
+        os.path.join(target_dir, SDK_STATE_FILE_NAME),
+        "w",
+    ) as f:
         json.dump(sdk_state, f, indent=4)
     log.info("SDK deployed.")
 
@@ -308,6 +324,14 @@ def main():
         help="uFBT state directory",
         default=".ufbt",
     )
+    # Force flag
+    parser.add_argument(
+        "--force",
+        "-f",
+        help="Force download",
+        action="store_true",
+        default=False,
+    )
     args = parser.parse_args()
 
     ufbt_work_dir = Path(args.ufbt_dir)
@@ -327,7 +351,7 @@ def main():
     else:
         parser.error("One of --branch or --channel must be specified")
 
-    deploy_sdk(ufbt_state_dir.absolute(), sdk_loader, args.hw_target)
+    deploy_sdk(ufbt_state_dir.absolute(), sdk_loader, args.hw_target, args.force)
 
 
 if __name__ == "__main__":
