@@ -30,6 +30,12 @@ AddOption(
     help="Custom main repo branch to use for SDK",
 )
 
+AddOption(
+    "--hw-target",
+    action="store",
+    dest="sdk_target",
+    help="SDK Hardware target",
+)
 
 vars = Variables("ufbt_options.py", ARGUMENTS)
 

@@ -254,8 +254,10 @@ def deploy_sdk(target_dir: str, sdk_loader: BaseSdkLoader, hw_target: str, force
         with open(os.path.join(target_dir, SDK_STATE_FILE_NAME), "r") as f:
             sdk_state = json.load(f)
         # Check if we need to update
-        if sdk_state.get("meta", {}).get("version") == sdk_loader.get_metadata().get(
-            "version"
+        if (
+            sdk_state.get("meta", {}).get("version")
+            == sdk_loader.get_metadata().get("version")
+            and sdk_state.get("meta", {}).get("hw_target") == hw_target
         ):
             log.info("SDK is up-to-date")
             return
