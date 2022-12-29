@@ -113,7 +113,7 @@ env = core_env.Clone(
     UFBT_API_VERSION=SdkCache(
         core_env.subst("$SDK_DEFINITION"), load_version_only=True
     ).version,
-    APPCHECK_COMSTR="\tAPPCHK\t${SOURCE}\n\t\tAPI: ${UFBT_API_VERSION}",
+    APPCHECK_COMSTR="\tAPPCHK\t${SOURCE}\n\t\tTarget: ${TARGET_HW}, API: ${UFBT_API_VERSION}",
 )
 
 wrap_tempfile(env, "LINKCOM")
