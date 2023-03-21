@@ -22,12 +22,14 @@ done
 # Check if .ufbt dir exists
 if [ ! -d "$UFBT_STATE_DIR/current" ]; then
     echo "Bootstrapping ufbt...";
-    python3 "$UFBT_SCRIPT_DIR/bootstrap.py" "--ufbt-dir=$UFBT_STATE_DIR" --channel dev;
+    python3 "$UFBT_SCRIPT_DIR/bootstrap.py" --ufbt-dir="$UFBT_STATE_DIR" --channel dev;
 fi
 
 if [ ! -d "$UFBT_STATE_DIR/current/scripts/ufbt" ]; then
     echo "Error: ufbt implementation not found in $UFBT_STATE_DIR/current/scripts/ufbt";
     echo "You might be trying to use an SDK in an outdated format.";
+    echo "You can try to bootstrap ufbt manually by running:";
+    echo "    python3 "$UFBT_SCRIPT_DIR/bootstrap.py" --ufbt-dir=$UFBT_STATE_DIR";
     exit 1;
 fi
 
