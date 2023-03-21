@@ -4,9 +4,6 @@ uFBT is a tool for building applications for Flipper Zero. It is a simplified ve
 
 uFBT allows you to perform basic development tasks for Flipper Zero, like building and debugging applications, flashing firmware. It uses prebuilt binaries and libraries, so you don't need to build the whole firmware to compile and debug your application.
 
-## Requirements
-
-For first uFBT run, you need Python 3.6+. After bootstrapping, uFBT will download and use a prebuilt toolchain.
 
 ## Installation
 
