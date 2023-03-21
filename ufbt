@@ -9,13 +9,26 @@ SCRIPT_PATH="$(cd "$(dirname "$0")" && pwd -P)";
 SCONS_EP="python3 -m SCons"
 export UFBT_STATE_DIR="${UFBT_STATE_DIR:-$HOME/.ufbt}";
 export UFBT_SCRIPT_DIR=$SCRIPT_PATH
-SCONS_DEFAULT_FLAGS="-Q --warn=target-not-built -C $UFBT_STATE_DIR/current/scripts/ufbt -f ufbt_impl.scons";
+SCONS_DEFAULT_FLAGS="-Q --warn=target-not-built -C $UFBT_STATE_DIR/current/scripts/ufbt";
 
+for i in "$@" ; do 
+    if [ $i == "purge" ] ; then 
+        echo "Cleaning up ufbt state dir: $UFBT_STATE_DIR";
+        rm -rf "$UFBT_STATE_DIR";
+        exit 0;
+    fi
+done
 
 # Check if .ufbt dir exists
 if [ ! -d "$UFBT_STATE_DIR/current" ]; then
     echo "Bootstrapping ufbt...";
     python3 "$UFBT_SCRIPT_DIR/bootstrap.py" "--ufbt-dir=$UFBT_STATE_DIR" --channel dev;
+fi
+
+if [ ! -d "$UFBT_STATE_DIR/current/scripts/ufbt" ]; then
+    echo "Error: ufbt implementation not found in $UFBT_STATE_DIR/current/scripts/ufbt";
+    echo "You might be trying to use an SDK in an outdated format.";
+    exit 1;
 fi
 
 FBT_TOOLCHAIN_PATH="${FBT_TOOLCHAIN_PATH:-$UFBT_STATE_DIR}";
