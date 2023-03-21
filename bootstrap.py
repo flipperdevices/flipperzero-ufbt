@@ -8,9 +8,7 @@ import tarfile
 import argparse
 
 from zipfile import ZipFile
-
 from pathlib import PurePosixPath, Path
-from pathlib import Path
 from urllib.parse import unquote, urlparse
 from urllib.request import urlopen
 from html.parser import HTMLParser
@@ -336,9 +334,9 @@ def main():
     )
     args = parser.parse_args()
 
-    ufbt_work_dir = Path(args.ufbt_dir)
-    ufbt_download_dir = ufbt_work_dir / "download"
-    ufbt_state_dir = ufbt_work_dir / "current"
+    ufbt_state_dir = Path(args.ufbt_dir)
+    ufbt_download_dir = ufbt_state_dir / "download"
+    ufbt_current_sdk_dir = ufbt_state_dir / "current"
 
     if args.branch and args.channel:
         parser.error("Only one of --branch and --channel can be specified")
@@ -353,7 +351,7 @@ def main():
     else:
         parser.error("One of --branch or --channel must be specified")
 
-    deploy_sdk(ufbt_state_dir.absolute(), sdk_loader, args.hw_target, args.force)
+    deploy_sdk(ufbt_current_sdk_dir.absolute(), sdk_loader, args.hw_target, args.force)
 
 
 if __name__ == "__main__":
