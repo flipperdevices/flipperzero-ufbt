@@ -1,13 +1,17 @@
 @echo off
 
-if not exist "%~dp0\.ufbt\current" (
-    echo Bootstrapping ufbt...
-    python "%~dp0\bootstrap.py" "--ufbt-dir=%~dp0\.ufbt" --channel dev
+if not defined UFBT_STATE_DIR (
+    set UFBT_STATE_DIR=%userprofile%\.ufbt
 )
 
-set "FBT_TOOLCHAIN_ROOT=%~dp0\.ufbt\toolchain\x86_64-windows"
+if not exist "%UFBT_STATE_DIR%\current" (
+    echo Bootstrapping ufbt...
+    python "%~dp0\bootstrap.py" "--ufbt-dir=%UFBT_STATE_DIR%" --channel dev
+)
 
-call "%~dp0\.ufbt\current\scripts\toolchain\fbtenv.cmd" env
+set "FBT_TOOLCHAIN_ROOT=%UFBT_STATE_DIR%\toolchain\x86_64-windows"
+
+call "%UFBT_STATE_DIR%\current\scripts\toolchain\fbtenv.cmd" env
 
 set SCONS_EP=python -m SCons
 set UFBT_ROOT_DIR="%~dp0."
