@@ -229,7 +229,9 @@ class UpdateChannelSdkLoader(BaseSdkLoader):
         return file_info
 
 
-def deploy_sdk(target_dir: str, sdk_loader: BaseSdkLoader, hw_target: str, force: bool):
+def deploy_sdk(
+    sdk_target_dir: str, sdk_loader: BaseSdkLoader, hw_target: str, force: bool
+):
     SDK_STATE_FILE_NAME = "sdk_state.json"
 
     sdk_layout = {
@@ -246,10 +248,10 @@ def deploy_sdk(target_dir: str, sdk_loader: BaseSdkLoader, hw_target: str, force
         ),
     }
 
-    log.info(f"uFBT state dir: {target_dir}")
-    if not force and os.path.exists(target_dir):
+    log.info(f"uFBT SDK dir: {sdk_target_dir}")
+    if not force and os.path.exists(sdk_target_dir):
         # Read existing state
-        with open(os.path.join(target_dir, SDK_STATE_FILE_NAME), "r") as f:
+        with open(os.path.join(sdk_target_dir, SDK_STATE_FILE_NAME), "r") as f:
             sdk_state = json.load(f)
         # Check if we need to update
         if (
@@ -260,7 +262,7 @@ def deploy_sdk(target_dir: str, sdk_loader: BaseSdkLoader, hw_target: str, force
             log.info("SDK is up-to-date")
             return
 
-    shutil.rmtree(target_dir, ignore_errors=True)
+    shutil.rmtree(sdk_target_dir, ignore_errors=True)
 
     sdk_state = {
         "meta": {"hw_target": hw_target, **sdk_loader.get_metadata()},
@@ -269,7 +271,7 @@ def deploy_sdk(target_dir: str, sdk_loader: BaseSdkLoader, hw_target: str, force
     for entry, (entry_dir, entry_path_converter) in sdk_layout.items():
         log.info(f"Deploying {entry} to {entry_dir}")
         sdk_component_path = sdk_loader.get_sdk_component(entry, hw_target)
-        component_dst_path = os.path.join(target_dir, entry_dir)
+        component_dst_path = os.path.join(sdk_target_dir, entry_dir)
         if sdk_component_path.endswith(".zip"):
             with ZipFile(sdk_component_path, "r") as zip_file:
                 zip_file.extractall(component_dst_path)
@@ -282,12 +284,12 @@ def deploy_sdk(target_dir: str, sdk_loader: BaseSdkLoader, hw_target: str, force
         if entry_path_converter:
             component_meta_path = entry_path_converter(sdk_component_path)
         else:
-            component_meta_path = os.path.relpath(component_dst_path, target_dir)
+            component_meta_path = os.path.relpath(component_dst_path, sdk_target_dir)
 
         sdk_state["components"][entry.value] = component_meta_path
 
     with open(
-        os.path.join(target_dir, SDK_STATE_FILE_NAME),
+        os.path.join(sdk_target_dir, SDK_STATE_FILE_NAME),
         "w",
     ) as f:
         json.dump(sdk_state, f, indent=4)
