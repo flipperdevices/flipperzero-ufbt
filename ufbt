@@ -9,16 +9,18 @@ SCRIPT_PATH="$(cd "$(dirname "$0")" && pwd -P)";
 SCONS_DEFAULT_FLAGS="-Q --warn=target-not-built -C $SCRIPT_PATH";
 SCONS_EP="python3 -m SCons"
 
+UFBT_STATE_DIR="${UFBT_STATE_DIR:-$HOME/.ufbt}";
+
 # Check if .ufbt dir exists
-if [ ! -d "$SCRIPT_PATH/.ufbt/current" ]; then
+if [ ! -d "$UFBT_STATE_DIR/current" ]; then
     echo "Bootstrapping ufbt...";
-    python3 "$SCRIPT_PATH/bootstrap.py" "--ufbt-dir=$SCRIPT_PATH/.ufbt" --channel dev;
+    python3 "$SCRIPT_PATH/bootstrap.py" "--ufbt-dir=$UFBT_STATE_DIR" --channel dev;
 fi
 
-FBT_TOOLCHAIN_PATH="${FBT_TOOLCHAIN_PATH:-$SCRIPT_PATH/.ufbt}";
+FBT_TOOLCHAIN_PATH="${FBT_TOOLCHAIN_PATH:-$UFBT_STATE_DIR}";
 
 UFBT_APP_DIR=`pwd`;
 
-. "$SCRIPT_PATH/.ufbt/current/scripts/toolchain/fbtenv.sh";
+. "$UFBT_STATE_DIR/current/scripts/toolchain/fbtenv.sh";
 
 $SCONS_EP $SCONS_DEFAULT_FLAGS "UFBT_APP_DIR=$UFBT_APP_DIR" "$@"
