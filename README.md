@@ -15,7 +15,7 @@ To update the SDK, run `ufbt update`. This will download and install all require
 
 To switch to a different version of the SDK, run `ufbt update --channel=[dev|rc|release]`. Or you can use any not-yet-merged branch from official repo, like `ufbt update --branch=feature/my-awesome-feature`.
 
-If something goes wrong and uFBT state becomes corrupted, you can reset it by running `ufbt purge`. If that doesn't work, you can try removing `.ufbt` subfolder manually from ufbt's folder.
+If something goes wrong and uFBT state becomes corrupted, you can reset it by running `ufbt purge`. If that doesn't work, you can try removing `.ufbt` subfolder manually from your home folder.
 
 ## Usage
 

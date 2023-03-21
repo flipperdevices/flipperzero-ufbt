@@ -6,15 +6,16 @@ set -eu;
 
 # private variables
 SCRIPT_PATH="$(cd "$(dirname "$0")" && pwd -P)";
-SCONS_DEFAULT_FLAGS="-Q --warn=target-not-built -C $SCRIPT_PATH";
 SCONS_EP="python3 -m SCons"
-
 export UFBT_STATE_DIR="${UFBT_STATE_DIR:-$HOME/.ufbt}";
+export UFBT_SCRIPT_DIR=$SCRIPT_PATH
+SCONS_DEFAULT_FLAGS="-Q --warn=target-not-built -C $UFBT_STATE_DIR/current/scripts/ufbt -f ufbt_impl.scons";
+
 
 # Check if .ufbt dir exists
 if [ ! -d "$UFBT_STATE_DIR/current" ]; then
     echo "Bootstrapping ufbt...";
-    python3 "$SCRIPT_PATH/bootstrap.py" "--ufbt-dir=$UFBT_STATE_DIR" --channel dev;
+    python3 "$UFBT_SCRIPT_DIR/bootstrap.py" "--ufbt-dir=$UFBT_STATE_DIR" --channel dev;
 fi
 
 FBT_TOOLCHAIN_PATH="${FBT_TOOLCHAIN_PATH:-$UFBT_STATE_DIR}";
