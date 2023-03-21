@@ -9,7 +9,7 @@ SCRIPT_PATH="$(cd "$(dirname "$0")" && pwd -P)";
 SCONS_DEFAULT_FLAGS="-Q --warn=target-not-built -C $SCRIPT_PATH";
 SCONS_EP="python3 -m SCons"
 
-UFBT_STATE_DIR="${UFBT_STATE_DIR:-$HOME/.ufbt}";
+export UFBT_STATE_DIR="${UFBT_STATE_DIR:-$HOME/.ufbt}";
 
 # Check if .ufbt dir exists
 if [ ! -d "$UFBT_STATE_DIR/current" ]; then
