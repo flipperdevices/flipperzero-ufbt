@@ -1,20 +1,16 @@
-import os
+import argparse
 import enum
 import json
+import logging
+import os
 import re
 import shutil
-import ssl
 import tarfile
-import argparse
-
-from zipfile import ZipFile
-from pathlib import PurePosixPath, Path
+from html.parser import HTMLParser
+from pathlib import Path, PurePosixPath
 from urllib.parse import unquote, urlparse
 from urllib.request import urlopen
-from html.parser import HTMLParser
-
-# Setup logging
-import logging
+from zipfile import ZipFile
 
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -23,10 +19,7 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-# Temporary fix for SSL negotiation failure on Mac
-_ssl_context = ssl.create_default_context()
-_ssl_context.check_hostname = False
-_ssl_context.verify_mode = ssl.CERT_NONE
+_ssl_context = None
 
 
 class FileType(enum.Enum):
@@ -334,7 +327,21 @@ def main():
         action="store_true",
         default=False,
     )
+    parser.add_argument(
+        "--no-check-certificate",
+        help="Disable SSL certificate verification",
+        action="store_true",
+        default=False,
+    )
+
     args = parser.parse_args()
+    if args.no_check_certificate:
+        # Temporary fix for SSL negotiation failure on Mac
+        import ssl
+
+        _ssl_context = ssl.create_default_context()
+        _ssl_context.check_hostname = False
+        _ssl_context.verify_mode = ssl.CERT_NONE
 
     ufbt_state_dir = Path(args.ufbt_dir)
     ufbt_download_dir = ufbt_state_dir / "download"
