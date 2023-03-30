@@ -40,41 +40,15 @@ class FileType(enum.Enum):
 
 
 class BaseSdkLoader:
-    class SdkEntry(enum.Enum):
-        SDK = "sdk"
-        SCRIPTS = "scripts"
-        LIB = "lib"
-        FW_ELF = "fwelf"
-        FW_BIN = "fwbin"
-        FW_BUNDLE = "fwbundle"
-
-    ANY_TARGET_FILE_TYPES = (
-        FileType.CORE2_FIRMWARE_TGZ,
-        FileType.SCRIPTS_TGZ,
-        FileType.RESOURCES_TGZ,
-    )
-
-    ENTRY_TO_FILE_TYPE = {
-        SdkEntry.SDK: FileType.SDK_ZIP,
-        SdkEntry.SCRIPTS: FileType.SCRIPTS_TGZ,
-        SdkEntry.LIB: FileType.LIB_ZIP,
-        SdkEntry.FW_ELF: FileType.FIRMWARE_ELF,
-        SdkEntry.FW_BIN: FileType.FULL_BIN,
-        SdkEntry.FW_BUNDLE: FileType.UPDATE_TGZ,
-    }
-
     def __init__(self, download_dir: str):
         self._download_dir = download_dir
 
     # Returns local FS path. Downloads file if necessary
-    def get_sdk_component(self, entry: SdkEntry, target: str):
+    def get_sdk_component(self, target: str):
         raise NotImplementedError()
 
     def get_metadata(self):
         raise NotImplementedError()
-
-    def _fixup_target_type(self, file_type: FileType, target: str) -> str:
-        return "any" if file_type in self.ANY_TARGET_FILE_TYPES else target
 
     def _fetch_file(self, url: str):
         log.debug(f"Fetching {url}")
@@ -144,11 +118,9 @@ class BranchSdkLoader(BaseSdkLoader):
             "version": self._version,
         }
 
-    def get_sdk_component(self, entry: BaseSdkLoader.SdkEntry, target: str):
-        file_type = self.ENTRY_TO_FILE_TYPE[entry]
-        target = self._fixup_target_type(self.ENTRY_TO_FILE_TYPE[entry], target)
-        if not (file_name := self._branch_files.get((file_type, target), None)):
-            raise ValueError(f"File not found for {entry} {target}")
+    def get_sdk_component(self, target: str):
+        if not (file_name := self._branch_files.get((FileType.SDK_ZIP, target), None)):
+            raise ValueError(f"SDK bundle not found for {target}")
 
         return self._fetch_file(self._branch_url + file_name)
 
@@ -164,11 +136,8 @@ class UpdateChannelSdkLoader(BaseSdkLoader):
         self.channel = channel
         self.version_info = self._fetch_version(self.channel)
 
-    def get_sdk_component(self, entry: BaseSdkLoader.SdkEntry, target: str):
-        file_type = self.ENTRY_TO_FILE_TYPE[entry]
-        target = self._fixup_target_type(file_type, target)
-
-        file_info = self._get_file_info(self.version_info, file_type, target)
+    def get_sdk_component(self, target: str):
+        file_info = self._get_file_info(self.version_info, FileType.SDK_ZIP, target)
         if not (file_url := file_info.get("url", None)):
             raise ValueError(f"Invalid file url")
 
@@ -225,67 +194,38 @@ class UpdateChannelSdkLoader(BaseSdkLoader):
 def deploy_sdk(
     sdk_target_dir: str, sdk_loader: BaseSdkLoader, hw_target: str, force: bool
 ):
-    SDK_STATE_FILE_NAME = "sdk_state.json"
-
-    sdk_layout = {
-        BaseSdkLoader.SdkEntry.SDK: ("sdk", None),
-        BaseSdkLoader.SdkEntry.SCRIPTS: (".", None),
-        BaseSdkLoader.SdkEntry.LIB: ("lib", None),
-        BaseSdkLoader.SdkEntry.FW_ELF: ("firmware.elf", None),
-        BaseSdkLoader.SdkEntry.FW_BIN: ("firmware.bin", None),
-        BaseSdkLoader.SdkEntry.FW_BUNDLE: (
-            ".",
-            lambda s: os.path.splitext(os.path.basename(s))[0].replace(
-                "flipper-z-", ""  # ugly
-            ),
-        ),
-    }
+    UFBT_STATE_FILE_NAME = "ufbt_state.json"
 
     log.info(f"uFBT SDK dir: {sdk_target_dir}")
     if not force and os.path.exists(sdk_target_dir):
         # Read existing state
-        with open(os.path.join(sdk_target_dir, SDK_STATE_FILE_NAME), "r") as f:
-            sdk_state = json.load(f)
+        with open(os.path.join(sdk_target_dir, UFBT_STATE_FILE_NAME), "r") as f:
+            ufbt_state = json.load(f)
         # Check if we need to update
         if (
-            sdk_state.get("meta", {}).get("version")
-            == sdk_loader.get_metadata().get("version")
-            and sdk_state.get("meta", {}).get("hw_target") == hw_target
+            ufbt_state.get("version") == sdk_loader.get_metadata().get("version")
+            and ufbt_state.get("hw_target") == hw_target
         ):
             log.info("SDK is up-to-date")
             return
 
     shutil.rmtree(sdk_target_dir, ignore_errors=True)
 
-    sdk_state = {
-        "meta": {"hw_target": hw_target, **sdk_loader.get_metadata()},
-        "components": {},
+    ufbt_state = {
+        "hw_target": hw_target,
+        **sdk_loader.get_metadata(),
     }
-    for entry, (entry_dir, entry_path_converter) in sdk_layout.items():
-        log.info(f"Deploying {entry} to {entry_dir}")
-        sdk_component_path = sdk_loader.get_sdk_component(entry, hw_target)
-        component_dst_path = os.path.join(sdk_target_dir, entry_dir)
-        if sdk_component_path.endswith(".zip"):
-            with ZipFile(sdk_component_path, "r") as zip_file:
-                zip_file.extractall(component_dst_path)
-        elif sdk_component_path.endswith(".tgz"):
-            with tarfile.open(sdk_component_path, "r:gz") as tar_file:
-                tar_file.extractall(component_dst_path)
-        else:
-            shutil.copy2(sdk_component_path, component_dst_path)
 
-        if entry_path_converter:
-            component_meta_path = entry_path_converter(sdk_component_path)
-        else:
-            component_meta_path = os.path.relpath(component_dst_path, sdk_target_dir)
-
-        sdk_state["components"][entry.value] = component_meta_path
+    log.info(f"Deploying SDK")
+    sdk_component_path = sdk_loader.get_sdk_component(hw_target)
+    with ZipFile(sdk_component_path, "r") as zip_file:
+        zip_file.extractall(sdk_target_dir)
 
     with open(
-        os.path.join(sdk_target_dir, SDK_STATE_FILE_NAME),
+        os.path.join(sdk_target_dir, UFBT_STATE_FILE_NAME),
         "w",
     ) as f:
-        json.dump(sdk_state, f, indent=4)
+        json.dump(ufbt_state, f, indent=4)
     log.info("SDK deployed.")
 
 
