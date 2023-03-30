@@ -5,7 +5,7 @@ import logging
 import os
 import re
 import shutil
-import tarfile
+import sys
 from html.parser import HTMLParser
 from pathlib import Path, PurePosixPath
 from urllib.parse import unquote, urlparse
@@ -207,7 +207,13 @@ def deploy_sdk(
             and ufbt_state.get("hw_target") == hw_target
         ):
             log.info("SDK is up-to-date")
-            return
+            return True
+
+    try:
+        sdk_component_path = sdk_loader.get_sdk_component(hw_target)
+    except Exception as e:
+        log.error(f"Failed to fetch SDK for {hw_target}: {e}")
+        return False
 
     shutil.rmtree(sdk_target_dir, ignore_errors=True)
 
@@ -217,7 +223,7 @@ def deploy_sdk(
     }
 
     log.info(f"Deploying SDK")
-    sdk_component_path = sdk_loader.get_sdk_component(hw_target)
+
     with ZipFile(sdk_component_path, "r") as zip_file:
         zip_file.extractall(sdk_target_dir)
 
@@ -227,6 +233,7 @@ def deploy_sdk(
     ) as f:
         json.dump(ufbt_state, f, indent=4)
     log.info("SDK deployed.")
+    return True
 
 
 def main():
@@ -300,8 +307,15 @@ def main():
     else:
         parser.error("One of --branch or --channel must be specified")
 
-    deploy_sdk(ufbt_current_sdk_dir.absolute(), sdk_loader, args.hw_target, args.force)
+    try:
+        if not deploy_sdk(
+            ufbt_current_sdk_dir.absolute(), sdk_loader, args.hw_target, args.force
+        ):
+            return 1
+    except Exception as e:
+        log.error(f"Failed to deploy SDK: {e}")
+        return 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main() or 0)
