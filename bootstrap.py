@@ -6,10 +6,12 @@ import os
 import re
 import shutil
 import sys
+from dataclasses import dataclass, field
 from html.parser import HTMLParser
 from pathlib import Path, PurePosixPath
+from typing import Optional
 from urllib.parse import unquote, urlparse
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 from zipfile import ZipFile
 
 logging.basicConfig(
@@ -18,8 +20,6 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 log = logging.getLogger(__name__)
-
-_ssl_context = None
 
 
 class FileType(enum.Enum):
@@ -40,6 +40,10 @@ class FileType(enum.Enum):
 
 
 class BaseSdkLoader:
+    VERSION_UNKNOWN = "unknown"
+    USER_AGENT = "UFBT Bootstrap"
+    _SSL_CONTEXT = None
+
     def __init__(self, download_dir: str):
         self._download_dir = download_dir
 
@@ -50,6 +54,14 @@ class BaseSdkLoader:
     def get_metadata(self):
         raise NotImplementedError()
 
+    @staticmethod
+    def metadata_to_init_kwargs(metadata: dict):
+        raise NotImplementedError()
+
+    def _open_url(self, url: str):
+        request = Request(url, headers={"User-Agent": self.USER_AGENT})
+        return urlopen(request, context=self._SSL_CONTEXT)
+
     def _fetch_file(self, url: str):
         log.debug(f"Fetching {url}")
         file_name = PurePosixPath(unquote(urlparse(url).path)).parts[-1]
@@ -57,9 +69,7 @@ class BaseSdkLoader:
 
         os.makedirs(self._download_dir, exist_ok=True)
 
-        with urlopen(url, context=_ssl_context) as response, open(
-            file_path, "wb"
-        ) as out_file:
+        with self._open_url(url) as response, open(file_path, "wb") as out_file:
             data = response.read()
             out_file.write(data)
 
@@ -67,6 +77,8 @@ class BaseSdkLoader:
 
 
 class BranchSdkLoader(BaseSdkLoader):
+    UPDATE_SERVER_BRANCH_ROOT = "https://update.flipperzero.one/builds/firmware"
+
     class LinkExtractor(HTMLParser):
         FILE_NAME_RE = re.compile(r"flipper-z-(\w+)-(\w+)-(.+)\.(\w+)")
 
@@ -92,10 +104,11 @@ class BranchSdkLoader(BaseSdkLoader):
                             f"Found multiple versions: {self.version} and {version}"
                         )
 
-    def __init__(self, branch: str, download_dir: str):
+    def __init__(self, download_dir: str, branch: str, branch_root_url: str = None):
         super().__init__(download_dir)
         self._branch = branch
-        self._branch_url = f"https://update.flipperzero.one/builds/firmware/{branch}/"
+        self._branch_root = branch_root_url or self.UPDATE_SERVER_BRANCH_ROOT
+        self._branch_url = f"{self._branch_root}/{branch}/"
         self._branch_files = {}
         self._version = None
         self._fetch_branch()
@@ -103,7 +116,7 @@ class BranchSdkLoader(BaseSdkLoader):
     def _fetch_branch(self):
         # Fetch html index page with links to files
         log.info(f"Fetching branch index {self._branch_url}")
-        with urlopen(self._branch_url, context=_ssl_context) as response:
+        with self._open_url(self._branch_url) as response:
             html = response.read().decode("utf-8")
             extractor = BranchSdkLoader.LinkExtractor()
             extractor.feed(html)
@@ -116,6 +129,14 @@ class BranchSdkLoader(BaseSdkLoader):
             "mode": "branch",
             "branch": self._branch,
             "version": self._version,
+            "branch_root_url": self._branch_root,
+        }
+
+    @staticmethod
+    def metadata_to_init_kwargs(metadata: dict):
+        return {
+            "branch": metadata["branch"],
+            "branch_root_url": metadata.get("branch_root_url", None),
         }
 
     def get_sdk_component(self, target: str):
@@ -126,14 +147,19 @@ class BranchSdkLoader(BaseSdkLoader):
 
 
 class UpdateChannelSdkLoader(BaseSdkLoader):
+    OFFICIAL_INDEX_URL = "https://update.flipperzero.one/firmware/directory.json"
+
     class UpdateChannel(enum.Enum):
         DEV = "development"
         RC = "release-candidate"
         RELEASE = "release"
 
-    def __init__(self, channel: UpdateChannel, download_dir: str):
+    def __init__(
+        self, download_dir: str, channel: UpdateChannel, index_url: str = None
+    ):
         super().__init__(download_dir)
         self.channel = channel
+        self.index_url = index_url or self.OFFICIAL_INDEX_URL
         self.version_info = self._fetch_version(self.channel)
 
     def get_sdk_component(self, target: str):
@@ -147,14 +173,22 @@ class UpdateChannelSdkLoader(BaseSdkLoader):
         return {
             "mode": "channel",
             "channel": self.channel.name.lower(),
+            "index_url": self.index_url,
             "version": self.version_info["version"],
         }
 
     @staticmethod
-    def _fetch_version(channel: UpdateChannel):
-        log.info(f"Fetching version info for {channel}")
-        url = "https://update.flipperzero.one/firmware/directory.json"
-        data = json.loads(urlopen(url, context=_ssl_context).read().decode("utf-8"))
+    def metadata_to_init_kwargs(metadata: dict):
+        return {
+            "channel": UpdateChannelSdkLoader.UpdateChannel[
+                metadata["channel"].upper()
+            ],
+            "index_url": metadata.get("index_url", None),
+        }
+
+    def _fetch_version(self, channel: UpdateChannel):
+        log.info(f"Fetching version info for {channel} from {self.index_url}")
+        data = json.loads(self._open_url(self.index_url).read().decode("utf-8"))
 
         channels = data.get("channels", [])
         if not channels:
@@ -191,59 +225,236 @@ class UpdateChannelSdkLoader(BaseSdkLoader):
         return file_info
 
 
-def deploy_sdk(
-    sdk_target_dir: str, sdk_loader: BaseSdkLoader, hw_target: str, force: bool
-):
+class UrlSdkLoader(BaseSdkLoader):
+    def __init__(self, download_dir: str, url: str):
+        super().__init__(download_dir)
+        self.url = url
+
+    def get_sdk_component(self, target: str):
+        return self._fetch_file(self.url)
+
+    def get_metadata(self):
+        return {"mode": "url", "url": self.url, "version": self.VERSION_UNKNOWN}
+
+    @staticmethod
+    def metadata_to_init_kwargs(metadata: dict):
+        return {"url": metadata["url"]}
+
+
+@dataclass
+class SdkDeployTask:
+    hw_target: str = None
+    force: bool = False
+    mode: str = None
+    all_params: dict[str, str] = field(default_factory=dict)
+
+    def update_from(self, other: "SdkDeployTask"):
+        log.debug(f"deploy task update from {other=}")
+        if other.hw_target:
+            self.hw_target = other.hw_target
+
+        if other.mode:
+            self.mode = other.mode
+
+        self.force = other.force
+        for key, value in other.all_params.items():
+            if value:
+                self.all_params[key] = value
+        log.debug(f"deploy task updated: {self=}")
+
+    @staticmethod
+    def default():
+        task = SdkDeployTask()
+        task.hw_target = "f7"
+        task.mode = "channel"
+        task.all_params["channel"] = UpdateChannelSdkLoader.UpdateChannel.RELEASE.value
+        return task
+
+    @staticmethod
+    def from_args(args: argparse.Namespace):
+        task = SdkDeployTask()
+        task.hw_target = args.hw_target
+        task.force = args.force
+        if args.branch:
+            task.mode = "branch"
+            task.all_params["branch"] = args.branch
+            if args.index_url:
+                task.all_params["branch_root_url"] = args.index_url
+        elif args.channel:
+            task.mode = "channel"
+            task.all_params["channel"] = args.channel
+            if args.index_url:
+                task.all_params["index_url"] = args.index_url
+        elif args.url:
+            task.mode = "url"
+            task.all_params["url"] = args
+        task.all_params = vars(args)
+        return task
+
+    @staticmethod
+    def from_dict(data):
+        task = SdkDeployTask()
+        task.hw_target = data.get("hw_target")
+        task.force = False
+        task.mode = data.get("mode")
+        task.all_params = data
+        return task
+
+
+class SdkLoaderFactory:
+    @staticmethod
+    def create_for_task(task: SdkDeployTask, download_dir: str):
+        log.debug(f"SdkLoaderFactory::create_for_task {task=}")
+        loader_cls = None
+        if task.mode == "branch":
+            loader_cls = BranchSdkLoader
+        elif task.mode == "channel":
+            loader_cls = UpdateChannelSdkLoader
+        elif task.mode == "url":
+            loader_cls = UrlSdkLoader
+        else:
+            raise ValueError(f"Invalid mode: {task.mode}")
+
+        ctor_kwargs = loader_cls.metadata_to_init_kwargs(task.all_params)
+        return loader_cls(download_dir, **ctor_kwargs)
+
+
+class UfbtSdkDeployer:
     UFBT_STATE_FILE_NAME = "ufbt_state.json"
 
-    log.info(f"uFBT SDK dir: {sdk_target_dir}")
-    if not force and os.path.exists(sdk_target_dir):
-        # Read existing state
-        with open(os.path.join(sdk_target_dir, UFBT_STATE_FILE_NAME), "r") as f:
+    def __init__(self, ufbt_state_dir: str):
+        self.ufbt_state_dir = Path(ufbt_state_dir)
+        self.download_dir = self.ufbt_state_dir / "download"
+        self.current_sdk_dir = self.ufbt_state_dir / "current"
+        self.state_file = self.current_sdk_dir / self.UFBT_STATE_FILE_NAME
+
+    def get_previous_task(self) -> Optional[SdkDeployTask]:
+        if not os.path.exists(self.state_file):
+            return None
+        with open(self.state_file, "r") as f:
             ufbt_state = json.load(f)
-        # Check if we need to update
-        if (
-            ufbt_state.get("version") == sdk_loader.get_metadata().get("version")
-            and ufbt_state.get("hw_target") == hw_target
-        ):
-            log.info("SDK is up-to-date")
-            return True
+        log.debug(f"get_previous_task() loaded state: {ufbt_state=}")
+        return SdkDeployTask.from_dict(ufbt_state)
 
-    try:
-        sdk_component_path = sdk_loader.get_sdk_component(hw_target)
-    except Exception as e:
-        log.error(f"Failed to fetch SDK for {hw_target}: {e}")
-        return False
+    def deploy(self, task: SdkDeployTask):
+        log.info(f"Deploying SDK for {task.hw_target}")
+        sdk_loader = SdkLoaderFactory.create_for_task(task, self.download_dir)
 
-    shutil.rmtree(sdk_target_dir, ignore_errors=True)
+        sdk_target_dir = self.current_sdk_dir.absolute()
+        log.info(f"uFBT SDK dir: {sdk_target_dir}")
+        if not task.force and os.path.exists(sdk_target_dir):
+            # Read existing state
+            with open(self.state_file, "r") as f:
+                ufbt_state = json.load(f)
+            # Check if we need to update
+            if ufbt_state.get("version") == sdk_loader.VERSION_UNKNOWN:
+                log.info("SDK is unversioned, updating")
+            elif (
+                ufbt_state.get("version") == sdk_loader.get_metadata().get("version")
+                and ufbt_state.get("hw_target") == task.hw_target
+            ):
+                log.info("SDK is up-to-date")
+                return True
 
-    ufbt_state = {
-        "hw_target": hw_target,
-        **sdk_loader.get_metadata(),
-    }
+        try:
+            sdk_component_path = sdk_loader.get_sdk_component(task.hw_target)
+        except Exception as e:
+            log.error(f"Failed to fetch SDK for {task.hw_target}: {e}")
+            return False
 
-    log.info(f"Deploying SDK")
+        shutil.rmtree(sdk_target_dir, ignore_errors=True)
 
-    with ZipFile(sdk_component_path, "r") as zip_file:
-        zip_file.extractall(sdk_target_dir)
+        ufbt_state = {
+            "hw_target": task.hw_target,
+            **sdk_loader.get_metadata(),
+        }
 
-    with open(
-        os.path.join(sdk_target_dir, UFBT_STATE_FILE_NAME),
-        "w",
-    ) as f:
-        json.dump(ufbt_state, f, indent=4)
-    log.info("SDK deployed.")
-    return True
+        log.info(f"Deploying SDK")
+
+        with ZipFile(sdk_component_path, "r") as zip_file:
+            zip_file.extractall(sdk_target_dir)
+
+        with open(self.state_file, "w") as f:
+            json.dump(ufbt_state, f, indent=4)
+        log.info("SDK deployed.")
+        return True
+
+
+def _update(args):
+    sdk_deployer = UfbtSdkDeployer(args.ufbt_dir)
+    current_task = SdkDeployTask.from_args(args)
+    task_to_deploy = None
+
+    if previous_task := sdk_deployer.get_previous_task():
+        previous_task.update_from(current_task)
+        task_to_deploy = previous_task
+    else:
+        if current_task.mode:
+            task_to_deploy = current_task
+        else:
+            log.error("No previous SDK state was found, fetching latest release")
+            log.error("Please specify mode explicitly. See -h for details")
+            task_to_deploy = SdkDeployTask.default()
+
+    if not sdk_deployer.deploy(task_to_deploy):
+        return 1
+
+
+def _clean(args):
+    sdk_deployer = UfbtSdkDeployer(args.ufbt_dir)
+    if args.purge:
+        log.info(f"Cleaning complete ufbt state in {sdk_deployer.ufbt_state_dir}")
+        shutil.rmtree(sdk_deployer.ufbt_state_dir, ignore_errors=True)
+        log.info("Done")
+        return
+
+    if args.downloads:
+        log.info(f"Cleaning download dir {sdk_deployer.download_dir}")
+        shutil.rmtree(sdk_deployer.download_dir, ignore_errors=True)
+    else:
+        log.info(f"Cleaning SDK state in {sdk_deployer.current_sdk_dir}")
+        shutil.rmtree(sdk_deployer.current_sdk_dir, ignore_errors=True)
+    log.info("Done")
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
+    root_parser = argparse.ArgumentParser()
+    root_parser.add_argument(
+        "--no-check-certificate",
+        help="Disable SSL certificate verification",
+        action="store_true",
+        default=False,
+    )
+    root_parser.add_argument(
+        "--ufbt-dir",
+        "-d",
+        help="uFBT state directory",
+        default=os.environ.get("UFBT_DIR", os.path.expanduser("~/.ufbt")),
+    )
+    root_parser.add_argument(
+        "--force",
+        "-f",
+        help="Force download",
+        action="store_true",
+        default=False,
+    )
+
+    parsers = root_parser.add_subparsers()
+    checkout_parser = parsers.add_parser("update")
+    checkout_parser.set_defaults(func=_update)
+
+    mode_group = checkout_parser.add_mutually_exclusive_group(required=False)
+    mode_group.add_argument(
+        "--url",
+        "-u",
+        help="URL to use",
+    )
+    mode_group.add_argument(
         "--branch",
         "-b",
         help="Branch to use",
     )
-    parser.add_argument(
+    mode_group.add_argument(
         "--channel",
         "-c",
         help="Update channel to use",
@@ -254,34 +465,32 @@ def main():
             )
         ),
     )
-    parser.add_argument(
+    checkout_parser.add_argument(
         "--hw-target",
         "-t",
         help="Hardware target",
-        default="f7",
     )
-    parser.add_argument(
-        "--ufbt-dir",
-        "-d",
-        help="uFBT state directory",
-        default=".ufbt",
-    )
-    # Force flag
-    parser.add_argument(
-        "--force",
-        "-f",
-        help="Force download",
-        action="store_true",
-        default=False,
-    )
-    parser.add_argument(
-        "--no-check-certificate",
-        help="Disable SSL certificate verification",
-        action="store_true",
-        default=False,
+    checkout_parser.add_argument(
+        "--index-url",
+        help="URL to use for update channel",
     )
 
-    args = parser.parse_args()
+    clean_parser = parsers.add_parser("clean")
+    clean_parser.add_argument(
+        "--downloads",
+        help="Clean downloads",
+        action="store_true",
+        default=False,
+    )
+    clean_parser.add_argument(
+        "--purge",
+        help="Purge whole ufbt state",
+        action="store_true",
+        default=False,
+    )
+    clean_parser.set_defaults(func=_clean)
+
+    args = root_parser.parse_args()
     if args.no_check_certificate:
         # Temporary fix for SSL negotiation failure on Mac
         import ssl
@@ -289,32 +498,19 @@ def main():
         _ssl_context = ssl.create_default_context()
         _ssl_context.check_hostname = False
         _ssl_context.verify_mode = ssl.CERT_NONE
+        BaseSdkLoader.SSL_CONTEXT = _ssl_context
 
-    ufbt_state_dir = Path(args.ufbt_dir)
-    ufbt_download_dir = ufbt_state_dir / "download"
-    ufbt_current_sdk_dir = ufbt_state_dir / "current"
-
-    if args.branch and args.channel:
-        parser.error("Only one of --branch and --channel can be specified")
-
-    if args.branch:
-        sdk_loader = BranchSdkLoader(args.branch, ufbt_download_dir)
-    elif args.channel:
-        sdk_loader = UpdateChannelSdkLoader(
-            UpdateChannelSdkLoader.UpdateChannel[args.channel.upper()],
-            ufbt_download_dir,
-        )
-    else:
-        parser.error("One of --branch or --channel must be specified")
+    if "func" not in args:
+        root_parser.print_help()
+        return 1
 
     try:
-        if not deploy_sdk(
-            ufbt_current_sdk_dir.absolute(), sdk_loader, args.hw_target, args.force
-        ):
-            return 1
+        return args.func(args)
+
     except Exception as e:
-        log.error(f"Failed to deploy SDK: {e}")
-        return 1
+        log.error(f"Failed to run operation: {e}")
+        # raise
+        return 2
 
 
 if __name__ == "__main__":
