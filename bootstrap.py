@@ -190,16 +190,14 @@ class UpdateChannelSdkLoader(BaseSdkLoader):
         log.info(f"Fetching version info for {channel} from {self.index_url}")
         data = json.loads(self._open_url(self.index_url).read().decode("utf-8"))
 
-        channels = data.get("channels", [])
-        if not channels:
+        if not (channels := data.get("channels", [])):
             raise ValueError(f"Invalid channel: {channel}")
 
         channel_data = next((c for c in channels if c["id"] == channel.value), None)
         if not channel_data:
             raise ValueError(f"Invalid channel: {channel}")
 
-        versions = channel_data.get("versions", [])
-        if not versions:
+        if not (versions := channel_data.get("versions", [])):
             raise ValueError(f"Empty channel: {channel}")
 
         log.info(f"Using version: {versions[0]['version']}")
@@ -207,19 +205,20 @@ class UpdateChannelSdkLoader(BaseSdkLoader):
 
     @staticmethod
     def _get_file_info(version_data: dict, file_type: FileType, file_target: str):
-        files = version_data.get("files", [])
-        if not files:
+
+        if not (files := version_data.get("files", [])):
             raise ValueError(f"Empty files list")
 
-        file_info = next(
-            (
-                f
-                for f in files
-                if f["type"] == file_type.value and f["target"] == file_target
-            ),
-            None,
-        )
-        if not file_info:
+        if not (
+            file_info := next(
+                (
+                    f
+                    for f in files
+                    if f["type"] == file_type.value and f["target"] == file_target
+                ),
+                None,
+            )
+        ):
             raise ValueError(f"Invalid file type: {file_type}")
 
         return file_info
@@ -272,6 +271,7 @@ class SdkDeployTask:
 
     @staticmethod
     def from_args(args: argparse.Namespace):
+        # TODO: unify construction for all modes?
         task = SdkDeployTask()
         task.hw_target = args.hw_target
         task.force = args.force
@@ -287,12 +287,12 @@ class SdkDeployTask:
                 task.all_params["index_url"] = args.index_url
         elif args.url:
             task.mode = "url"
-            task.all_params["url"] = args
+            task.all_params["url"] = args.url
         task.all_params = vars(args)
         return task
 
     @staticmethod
-    def from_dict(data):
+    def from_dict(data: dict[str, str]):
         task = SdkDeployTask()
         task.hw_target = data.get("hw_target")
         task.force = False
@@ -509,7 +509,7 @@ def main():
 
     except Exception as e:
         log.error(f"Failed to run operation: {e}")
-        # raise
+        # raise # Uncomment to get full stack trace
         return 2
 
 
