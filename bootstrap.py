@@ -418,6 +418,23 @@ def _clean(args):
     log.info("Done")
 
 
+def _status(args):
+    sdk_deployer = UfbtSdkDeployer(args.ufbt_dir)
+    if previous_task := sdk_deployer.get_previous_task():
+        log.info(f"State dir: \t\t{sdk_deployer.ufbt_state_dir}")
+        log.info(f"SDK dir: \t\t{sdk_deployer.current_sdk_dir}")
+        log.info(f"Download dir: \t{sdk_deployer.download_dir}")
+        log.info(f"Target: \t\t{previous_task.hw_target}")
+        log.info(
+            f"Version: \t\t{previous_task.all_params.get('version', BaseSdkLoader.VERSION_UNKNOWN)}"
+        )
+        log.info(f"Mode: \t\t{previous_task.mode}")
+        log.info(f"Details: \t\t{previous_task.all_params}")
+    else:
+        log.error("SDK is not deployed")
+        return 1
+
+
 def main():
     root_parser = argparse.ArgumentParser()
     root_parser.add_argument(
@@ -490,6 +507,9 @@ def main():
         default=False,
     )
     clean_parser.set_defaults(func=_clean)
+
+    status_parser = parsers.add_parser("status")
+    status_parser.set_defaults(func=_status)
 
     args = root_parser.parse_args()
     if args.no_check_certificate:
