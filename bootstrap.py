@@ -230,6 +230,7 @@ class UrlSdkLoader(BaseSdkLoader):
         self.url = url
 
     def get_sdk_component(self, target: str):
+        log.info(f"Fetching SDK from {self.url}")
         return self._fetch_file(self.url)
 
     def get_metadata(self):
