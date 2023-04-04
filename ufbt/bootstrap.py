@@ -13,7 +13,7 @@ import sys
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
 from pathlib import Path, PurePosixPath
-from typing import Optional
+from typing import ClassVar, Optional
 from urllib.parse import unquote, urlparse
 from urllib.request import Request, urlopen
 from zipfile import ZipFile
@@ -26,6 +26,8 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 ##############################################################################
+
+bootstrap_subcommands = ("update", "status", "clean")
 
 
 class FileType(enum.Enum):
@@ -280,6 +282,8 @@ class SdkDeployTask:
     mode: str = None
     all_params: dict[str, str] = field(default_factory=dict)
 
+    DEFAULT_HW_TARGET: ClassVar[str] = "f7"
+
     def update_from(self, other: "SdkDeployTask"):
         log.debug(f"deploy task update from {other=}")
         if other.hw_target:
@@ -297,7 +301,7 @@ class SdkDeployTask:
     @staticmethod
     def default():
         task = SdkDeployTask()
-        task.hw_target = "f7"
+        task.hw_target = SdkDeployTask.DEFAULT_HW_TARGET
         task.mode = "channel"
         task.all_params["channel"] = UpdateChannelSdkLoader.UpdateChannel.RELEASE.value
         return task
@@ -306,7 +310,7 @@ class SdkDeployTask:
     def from_args(args: argparse.Namespace):
         # TODO: unify construction for all modes?
         task = SdkDeployTask()
-        task.hw_target = args.hw_target
+        task.hw_target = args.hw_target or SdkDeployTask.DEFAULT_HW_TARGET
         task.force = args.force
         if args.branch:
             task.mode = "branch"
