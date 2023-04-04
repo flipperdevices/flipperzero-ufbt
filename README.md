@@ -2,7 +2,7 @@
 
 uFBT is a tool for building applications for Flipper Zero. It is a simplified version of [Flipper Build Tool (FBT)](https://github.com/flipperdevices/flipperzero-firmware/blob/dev/documentation/fbt.md). 
 
-uFBT allows you to perform basic development tasks for Flipper Zero, like building and debugging applications, flashing firmware. It uses prebuilt binaries and libraries, so you don't need to build the whole firmware to compile and debug your application.
+uFBT enables basic development tasks for Flipper Zero, like building and debugging applications, flashing firmware. It uses prebuilt binaries and libraries, so you don't need to build the whole firmware to compile and debug your application for Flipper.
 
 ## Installation
 
