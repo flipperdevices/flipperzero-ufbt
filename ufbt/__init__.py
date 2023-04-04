@@ -32,8 +32,8 @@ def ufbt_ep():
 
     if platform.system() == "Windows":
         commandline = (
-            'call "%UFBT_STATE_DIR%\current\scripts\toolchain\fbtenv.cmd" env'
-            f'python3 -m SCons -Q --warn=target-not-built -C "%UFBT_STATE_DIR%/current/scripts/ufbt" "UFBT_APP_DIR={UFBT_APP_DIR}" '
+            'call "%UFBT_STATE_DIR%/current/scripts/toolchain/fbtenv.cmd" env & '
+            f'python -m SCons -Q --warn=target-not-built -C "%UFBT_STATE_DIR%/current/scripts/ufbt" "UFBT_APP_DIR={UFBT_APP_DIR}" '
             + " ".join(sys.argv[1:])
         )
 
