@@ -1,3 +1,7 @@
+###
+# Bootstrap script for uFBT. Deploys SDK and metadata.
+###
+
 import argparse
 import enum
 import json
@@ -21,6 +25,8 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
+##############################################################################
+
 
 class FileType(enum.Enum):
     SDK_ZIP = "sdk_zip"
@@ -40,8 +46,12 @@ class FileType(enum.Enum):
 
 
 class BaseSdkLoader:
+    """
+    Base class for SDK loaders.
+    """
+
     VERSION_UNKNOWN = "unknown"
-    USER_AGENT = "UFBT Bootstrap"
+    USER_AGENT = "uFBT SDKLoader/0.2"
     _SSL_CONTEXT = None
 
     def __init__(self, download_dir: str):
@@ -77,6 +87,11 @@ class BaseSdkLoader:
 
 
 class BranchSdkLoader(BaseSdkLoader):
+    """
+    Loads SDK from a branch on update server.
+    Uses HTML parsing of index page to find all files in the branch.
+    """
+
     UPDATE_SERVER_BRANCH_ROOT = "https://update.flipperzero.one/builds/firmware"
 
     class LinkExtractor(HTMLParser):
@@ -147,6 +162,12 @@ class BranchSdkLoader(BaseSdkLoader):
 
 
 class UpdateChannelSdkLoader(BaseSdkLoader):
+    """
+    Loads SDK from a release channel on update server.
+    Uses JSON index to find all files in the channel.
+    Supports official update server and unofficial servers following the same format.
+    """
+
     OFFICIAL_INDEX_URL = "https://update.flipperzero.one/firmware/directory.json"
 
     class UpdateChannel(enum.Enum):
@@ -225,6 +246,10 @@ class UpdateChannelSdkLoader(BaseSdkLoader):
 
 
 class UrlSdkLoader(BaseSdkLoader):
+    """
+    Loads SDK from a static URL. Does not extract version info.
+    """
+
     def __init__(self, download_dir: str, url: str):
         super().__init__(download_dir)
         self.url = url
@@ -241,8 +266,15 @@ class UrlSdkLoader(BaseSdkLoader):
         return {"url": metadata["url"]}
 
 
+##############################################################################
+
+
 @dataclass
 class SdkDeployTask:
+    """
+    Wrapper for SDK deploy task parameters.
+    """
+
     hw_target: str = None
     force: bool = False
     mode: str = None
@@ -381,6 +413,9 @@ class UfbtSdkDeployer:
         return True
 
 
+###############################################################################
+
+
 def _update(args):
     sdk_deployer = UfbtSdkDeployer(args.ufbt_dir)
     current_task = SdkDeployTask.from_args(args)
@@ -433,6 +468,9 @@ def _status(args):
     else:
         log.error("SDK is not deployed")
         return 1
+
+
+###############################################################################
 
 
 def main():
