@@ -1,6 +1,6 @@
 # uFBT - micro Flipper Build Tool
 
-uFBT is a cross-platform tool for building applications for Flipper Zero. It is a simplified version of [Flipper Build Tool (FBT)](https://github.com/flipperdevices/flipperzero-firmware/blob/dev/documentation/fbt.md).
+uFBT is a cross-platform tool for building applications for [Flipper Zero](https://flipperzero.one/). It is a simplified version of [Flipper Build Tool (FBT)](https://github.com/flipperdevices/flipperzero-firmware/blob/dev/documentation/fbt.md).
 
 uFBT enables basic development tasks for Flipper Zero, like building and debugging applications, flashing firmware, creating VSCode development configurations. It uses prebuilt binaries and libraries, so you don't need to build the whole firmware to compile and debug your application for Flipper.
 
@@ -8,11 +8,9 @@ uFBT enables basic development tasks for Flipper Zero, like building and debuggi
 
 uFBT uses your system's Python for running bootstrap code. Minimal supported Python version is 3.8.
 
-### Linux & macOS
-`python3 -m pip install --upgrade ufbt`
+- **Linux & macOS**: `python3 -m pip install --upgrade ufbt`
 
-### Windows
-`py -m pip install --upgrade ufbt`
+- **Windows**: `py -m pip install --upgrade ufbt`
 
 When running actual build tasks, uFBT will download and use its own Python binaries and a toolchain for your platform.
 
@@ -52,9 +50,9 @@ Application manifests are explained in the [FBT documentation](https://github.co
 To update the SDK, run `ufbt update`. This will download and install all required SDK components from previously used source.
 
 - To switch to SDK for a different release channel, run `ufbt update --channel=[dev|rc|release]`. 
+    - uFBT also supports 3rd-party update indexers, following the same schema as [official firmware](https://github.com/flipperdevices/flipperzero-firmware). To use them, run `ufbt update --index-url=<url>`, where `<url>` is a URL to the index file, e.g. `https://update.flipperzero.one/firmware/directory.json`.
 - To use SDK for a certain release or a not-yet-merged branch from official repo, run `ufbt update --branch=0.81.1` or `ufbt update --branch=owner/my-awesome-feature`. 
     - You can also use branches from other repos, where build artifacts are available from an indexed directory, by specifying `--index-url=<url>`.
-    - uFBT also supports 3rd-party update indexers, following the same schema as official firmware. To use them, run `ufbt update --index-url=<url>`, where `<url>` is a URL to the index file, e.g. `https://update.flipperzero.one/firmware/directory.json`.
 
 - uFBT can also download and update the SDK from any fixed URL. To do this, run `ufbt update --url=<url>`.
 
