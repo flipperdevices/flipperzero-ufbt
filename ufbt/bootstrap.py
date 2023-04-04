@@ -13,7 +13,7 @@ import sys
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
 from pathlib import Path, PurePosixPath
-from typing import ClassVar, Optional
+from typing import ClassVar, Dict, Optional
 from urllib.parse import unquote, urlparse
 from urllib.request import Request, urlopen
 from zipfile import ZipFile
@@ -280,7 +280,7 @@ class SdkDeployTask:
     hw_target: str = None
     force: bool = False
     mode: str = None
-    all_params: dict[str, str] = field(default_factory=dict)
+    all_params: Dict[str, str] = field(default_factory=dict)
 
     DEFAULT_HW_TARGET: ClassVar[str] = "f7"
 
