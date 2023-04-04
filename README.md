@@ -4,18 +4,19 @@ uFBT is a tool for building applications for Flipper Zero. It is a simplified ve
 
 uFBT allows you to perform basic development tasks for Flipper Zero, like building and debugging applications, flashing firmware. It uses prebuilt binaries and libraries, so you don't need to build the whole firmware to compile and debug your application.
 
-
 ## Installation
 
-Clone this repository and add its path to your `PATH` environment variable. On first run, uFBT will download and install all required SDK components from `dev` branch of official firmware.
+uFBT uses your system's Python for running bootstrap code. Minimal supported Python version is 3.8.
 
-### Updating the SDK
+### Linux
+`python3 -m pip install --upgrade ufbt`
 
-To update the SDK, run `ufbt update`. This will download and install all required SDK components from previously used channel or branch.
+### Windows
+`py -m pip install --upgrade ufbt`
 
-To switch to a different version of the SDK, run `ufbt update --channel=[dev|rc|release]`. Or you can use any not-yet-merged branch from official repo, like `ufbt update --branch=feature/my-awesome-feature`.
+When running actual build tasks, uFBT will download and use its own Python binaries and a toolchain for your platform.
 
-If something goes wrong and uFBT state becomes corrupted, you can reset it by running `ufbt purge`. If that doesn't work, you can try removing `.ufbt` subfolder manually from your home folder.
+On first run, uFBT will download and install required SDK components from `dev` branch of official firmware. For more information on how to switch to a different version of the SDK, see [Managing the SDK](#managing-the-sdk) section.
 
 ## Usage
 
@@ -38,9 +39,31 @@ uFBT provides a configuration for VSCode that allows you to build and debug your
 ### Application template
 
 uFBT can create a template for your application. To do this, run `ufbt create APPID=<app_id>` in the directory where you want to create your application. It will create an application manifest and its main source file. You can then build and debug your application using the instructions above.
+
 Application manifests are explained in the [FBT documentation](https://github.com/flipperdevices/flipperzero-firmware/blob/dev/documentation/AppManifests.md).
 
 ### Other
 
  * `ufbt cli` starts a CLI session with the device;
  * `ufbt lint`, `ufbt format` run clang-format on application's sources.
+
+## Managing the SDK
+
+To update the SDK, run `ufbt update`. This will download and install all required SDK components from previously used source.
+
+To switch to a different version of the SDK, run `ufbt update --channel=[dev|rc|release]`. Or you can use any not-yet-merged branch from official repo, like `ufbt update --branch=feature/my-awesome-feature`. For using branches from other repos, where build artifacts are available from an indexed directory, use `--index-url=<url>`.
+
+uFBT also supports 3rd-party update indexers, following the same schema as official firmware. To use them, run `ufbt update --index-url=<url>`, where `<url>` is a URL to the index file, e.g. `https://update.flipperzero.one/firmware/directory.json`.
+
+uFBT can also download and update the SDK from any fixed URL. To do this, run `ufbt update --url=<url>`.
+
+uFBT stores its state in `.ufbt` subfolder in your home directory. You can override this location by setting `UFBT_DIR` environment variable.
+
+
+### ufbt-bootstrap
+
+Updating the SDK is handled by uFBT component called _bootstrap_. It has a dedicated entry point, `ufbt-bootstrap`, with additional options that might be useful in certain scenarios. Run `ufbt-bootstrap --help` to see them.
+
+### Troubleshooting
+
+If something goes wrong and uFBT state becomes corrupted, you can reset it by running `ufbt clean`. If that doesn't work, you can try removing `.ufbt` subfolder manually from your home folder.

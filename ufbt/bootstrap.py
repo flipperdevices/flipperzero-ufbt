@@ -492,7 +492,7 @@ def main() -> Optional[int]:
         "--ufbt-dir",
         "-d",
         help="uFBT state directory",
-        default=os.environ.get("UFBT_DIR", os.path.expanduser("~/.ufbt")),
+        default=os.environ.get("UFBT_HOME", os.path.expanduser("~/.ufbt")),
     )
     root_parser.add_argument(
         "--force",
