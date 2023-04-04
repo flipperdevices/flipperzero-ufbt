@@ -1,19 +1,26 @@
-import sys
 import os
 import pathlib
 import platform
+import sys
+
+from .bootstrap import bootstrap_subcommands
+from .bootstrap import main as bootstrap_main
 
 
-def main():
+def ufbt_ep():
     if not os.environ.get("UFBT_STATE_DIR"):
         os.environ["UFBT_STATE_DIR"] = os.path.expanduser("~/.ufbt")
     if not os.environ.get("FBT_TOOLCHAIN_PATH"):
         os.environ["FBT_TOOLCHAIN_PATH"] = os.environ["UFBT_STATE_DIR"]
 
     ufbt_state_dir = pathlib.Path(os.environ["UFBT_STATE_DIR"])
-    if not os.path.exists(ufbt_state_dir):
-        from ufbt.bootstrap import main as bootstrap_main
 
+    if any(
+        map(sys.argv.__contains__, bootstrap_subcommands)
+    ):  # if any of the subcommands are in the arguments
+        return bootstrap_main()
+
+    if not os.path.exists(ufbt_state_dir):
         bootstrap_main()
 
     if not (ufbt_state_dir / "current" / "scripts" / "ufbt").exists():
@@ -42,4 +49,4 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main() or 0)
+    sys.exit(ufbt_ep() or 0)
