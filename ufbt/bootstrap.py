@@ -60,21 +60,21 @@ class BaseSdkLoader:
         self._download_dir = download_dir
 
     # Returns local FS path. Downloads file if necessary
-    def get_sdk_component(self, target: str):
+    def get_sdk_component(self, target: str) -> str:
         raise NotImplementedError()
 
-    def get_metadata(self):
+    def get_metadata(self) -> Dict[str, str]:
         raise NotImplementedError()
 
     @staticmethod
-    def metadata_to_init_kwargs(metadata: dict):
+    def metadata_to_init_kwargs(metadata: dict) -> Dict[str, str]:
         raise NotImplementedError()
 
     def _open_url(self, url: str):
         request = Request(url, headers={"User-Agent": self.USER_AGENT})
         return urlopen(request, context=self._SSL_CONTEXT)
 
-    def _fetch_file(self, url: str):
+    def _fetch_file(self, url: str) -> str:
         log.debug(f"Fetching {url}")
         file_name = PurePosixPath(unquote(urlparse(url).path)).parts[-1]
         file_path = os.path.join(self._download_dir, file_name)
@@ -99,7 +99,7 @@ class BranchSdkLoader(BaseSdkLoader):
     class LinkExtractor(HTMLParser):
         FILE_NAME_RE = re.compile(r"flipper-z-(\w+)-(\w+)-(.+)\.(\w+)")
 
-        def reset(self):
+        def reset(self) -> None:
             super().reset()
             self.files = {}
             self.version = None
@@ -130,7 +130,7 @@ class BranchSdkLoader(BaseSdkLoader):
         self._version = None
         self._fetch_branch()
 
-    def _fetch_branch(self):
+    def _fetch_branch(self) -> None:
         # Fetch html index page with links to files
         log.info(f"Fetching branch index {self._branch_url}")
         with self._open_url(self._branch_url) as response:
@@ -141,7 +141,7 @@ class BranchSdkLoader(BaseSdkLoader):
             self._version = extractor.version
         log.info(f"Found version {self._version}")
 
-    def get_metadata(self):
+    def get_metadata(self) -> Dict[str, str]:
         return {
             "mode": "branch",
             "branch": self._branch,
@@ -150,13 +150,13 @@ class BranchSdkLoader(BaseSdkLoader):
         }
 
     @staticmethod
-    def metadata_to_init_kwargs(metadata: dict):
+    def metadata_to_init_kwargs(metadata: dict) -> Dict[str, str]:
         return {
             "branch": metadata["branch"],
             "branch_root_url": metadata.get("branch_root_url", None),
         }
 
-    def get_sdk_component(self, target: str):
+    def get_sdk_component(self, target: str) -> str:
         if not (file_name := self._branch_files.get((FileType.SDK_ZIP, target), None)):
             raise ValueError(f"SDK bundle not found for {target}")
 
@@ -185,14 +185,14 @@ class UpdateChannelSdkLoader(BaseSdkLoader):
         self.index_url = index_url or self.OFFICIAL_INDEX_URL
         self.version_info = self._fetch_version(self.channel)
 
-    def get_sdk_component(self, target: str):
+    def get_sdk_component(self, target: str) -> str:
         file_info = self._get_file_info(self.version_info, FileType.SDK_ZIP, target)
         if not (file_url := file_info.get("url", None)):
             raise ValueError(f"Invalid file url")
 
         return self._fetch_file(file_url)
 
-    def get_metadata(self):
+    def get_metadata(self) -> Dict[str, str]:
         return {
             "mode": "channel",
             "channel": self.channel.name.lower(),
@@ -201,7 +201,7 @@ class UpdateChannelSdkLoader(BaseSdkLoader):
         }
 
     @staticmethod
-    def metadata_to_init_kwargs(metadata: dict):
+    def metadata_to_init_kwargs(metadata: dict) -> Dict[str, str]:
         return {
             "channel": UpdateChannelSdkLoader.UpdateChannel[
                 metadata["channel"].upper()
@@ -209,7 +209,7 @@ class UpdateChannelSdkLoader(BaseSdkLoader):
             "index_url": metadata.get("index_url", None),
         }
 
-    def _fetch_version(self, channel: UpdateChannel):
+    def _fetch_version(self, channel: UpdateChannel) -> dict:
         log.info(f"Fetching version info for {channel} from {self.index_url}")
         data = json.loads(self._open_url(self.index_url).read().decode("utf-8"))
 
@@ -256,15 +256,15 @@ class UrlSdkLoader(BaseSdkLoader):
         super().__init__(download_dir)
         self.url = url
 
-    def get_sdk_component(self, target: str):
+    def get_sdk_component(self, target: str) -> str:
         log.info(f"Fetching SDK from {self.url}")
         return self._fetch_file(self.url)
 
-    def get_metadata(self):
+    def get_metadata(self) -> Dict[str, str]:
         return {"mode": "url", "url": self.url, "version": self.VERSION_UNKNOWN}
 
     @staticmethod
-    def metadata_to_init_kwargs(metadata: dict):
+    def metadata_to_init_kwargs(metadata: dict) -> Dict[str, str]:
         return {"url": metadata["url"]}
 
 
@@ -284,7 +284,7 @@ class SdkDeployTask:
 
     DEFAULT_HW_TARGET: ClassVar[str] = "f7"
 
-    def update_from(self, other: "SdkDeployTask"):
+    def update_from(self, other: "SdkDeployTask") -> None:
         log.debug(f"deploy task update from {other=}")
         if other.hw_target:
             self.hw_target = other.hw_target
@@ -299,7 +299,7 @@ class SdkDeployTask:
         log.debug(f"deploy task updated: {self=}")
 
     @staticmethod
-    def default():
+    def default() -> "SdkDeployTask":
         task = SdkDeployTask()
         task.hw_target = SdkDeployTask.DEFAULT_HW_TARGET
         task.mode = "channel"
@@ -307,7 +307,7 @@ class SdkDeployTask:
         return task
 
     @staticmethod
-    def from_args(args: argparse.Namespace):
+    def from_args(args: argparse.Namespace) -> "SdkDeployTask":
         # TODO: unify construction for all modes?
         task = SdkDeployTask()
         task.hw_target = args.hw_target or SdkDeployTask.DEFAULT_HW_TARGET
@@ -329,7 +329,7 @@ class SdkDeployTask:
         return task
 
     @staticmethod
-    def from_dict(data: dict[str, str]):
+    def from_dict(data: Dict[str, str]) -> "SdkDeployTask":
         task = SdkDeployTask()
         task.hw_target = data.get("hw_target")
         task.force = False
@@ -340,7 +340,7 @@ class SdkDeployTask:
 
 class SdkLoaderFactory:
     @staticmethod
-    def create_for_task(task: SdkDeployTask, download_dir: str):
+    def create_for_task(task: SdkDeployTask, download_dir: str) -> BaseSdkLoader:
         log.debug(f"SdkLoaderFactory::create_for_task {task=}")
         loader_cls = None
         if task.mode == "branch":
@@ -373,7 +373,7 @@ class UfbtSdkDeployer:
         log.debug(f"get_previous_task() loaded state: {ufbt_state=}")
         return SdkDeployTask.from_dict(ufbt_state)
 
-    def deploy(self, task: SdkDeployTask):
+    def deploy(self, task: SdkDeployTask) -> bool:
         log.info(f"Deploying SDK for {task.hw_target}")
         sdk_loader = SdkLoaderFactory.create_for_task(task, self.download_dir)
 
@@ -420,7 +420,7 @@ class UfbtSdkDeployer:
 ###############################################################################
 
 
-def _update(args):
+def _update(args) -> int:
     sdk_deployer = UfbtSdkDeployer(args.ufbt_dir)
     current_task = SdkDeployTask.from_args(args)
     task_to_deploy = None
@@ -438,9 +438,10 @@ def _update(args):
 
     if not sdk_deployer.deploy(task_to_deploy):
         return 1
+    return 0
 
 
-def _clean(args):
+def _clean(args) -> int:
     sdk_deployer = UfbtSdkDeployer(args.ufbt_dir)
     if args.purge:
         log.info(f"Cleaning complete ufbt state in {sdk_deployer.ufbt_state_dir}")
@@ -455,9 +456,10 @@ def _clean(args):
         log.info(f"Cleaning SDK state in {sdk_deployer.current_sdk_dir}")
         shutil.rmtree(sdk_deployer.current_sdk_dir, ignore_errors=True)
     log.info("Done")
+    return 0
 
 
-def _status(args):
+def _status(args) -> int:
     sdk_deployer = UfbtSdkDeployer(args.ufbt_dir)
     if previous_task := sdk_deployer.get_previous_task():
         log.info(f"State dir: \t\t{sdk_deployer.ufbt_state_dir}")
@@ -469,6 +471,7 @@ def _status(args):
         )
         log.info(f"Mode: \t\t{previous_task.mode}")
         log.info(f"Details: \t\t{previous_task.all_params}")
+        return 0
     else:
         log.error("SDK is not deployed")
         return 1
@@ -477,7 +480,7 @@ def _status(args):
 ###############################################################################
 
 
-def main():
+def main() -> Optional[int]:
     root_parser = argparse.ArgumentParser()
     root_parser.add_argument(
         "--no-check-certificate",
