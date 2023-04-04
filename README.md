@@ -8,7 +8,7 @@ uFBT enables basic development tasks for Flipper Zero, like building and debuggi
 
 uFBT uses your system's Python for running bootstrap code. Minimal supported Python version is 3.8.
 
-### Linux
+### Linux & macOS
 `python3 -m pip install --upgrade ufbt`
 
 ### Windows

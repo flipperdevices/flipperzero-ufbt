@@ -4,9 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ufbt"
-version = "0.2.0b2"
+version = "0.2.0b3"
 authors = [{ name = "Flipper Devices Inc.", email = "pypi@flipperdevices.com" }]
-description = "uFBT - micro Flipper Build Tool. A tool for building and developing applications for Flipper Zero and its device family."
+description = "uFBT - micro Flipper Build Tool. Tool for building and developing applications for Flipper Zero and its device family."
 readme = "README.md"
 requires-python = ">=3.8"
 keywords = ["ufbt", "flipperzero", "fbt", "stm32", "fap"]
