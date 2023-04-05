@@ -48,12 +48,12 @@ Application manifests are explained in the [FBT documentation](https://github.co
 
 To update the SDK, run `ufbt update`. This will download and install all required SDK components from previously used source.
 
-- To switch to SDK for a different release channel, run `ufbt update --channel=[dev|rc|release]`. 
+- To switch to SDK for a different **release channel**, run `ufbt update --channel=[dev|rc|release]`. 
     - uFBT also supports 3rd-party update indexers, following the same schema as [official firmware](https://github.com/flipperdevices/flipperzero-firmware). To use them, run `ufbt update --index-url=<url>`, where `<url>` is a URL to the index file, e.g. `https://update.flipperzero.one/firmware/directory.json`.
-- To use SDK for a certain release or a not-yet-merged branch from official repo, run `ufbt update --branch=0.81.1` or `ufbt update --branch=owner/my-awesome-feature`. 
+- To use SDK for a **certain release** or a not-yet-merged **branch** from official repo, run `ufbt update --branch=0.81.1` or `ufbt update --branch=owner/my-awesome-feature`. 
     - You can also use branches from other repos, where build artifacts are available from an indexed directory, by specifying `--index-url=<url>`.
-
-- uFBT can also download and update the SDK from any fixed URL. To do this, run `ufbt update --url=<url>`.
+- uFBT can also download and update the SDK from any **fixed URL**. To do this, run `ufbt update --url=<url>`.
+- To use a **local copy** of the SDK, run `ufbt update --local=<path>`. This will use the SDK located in `<path>` instead of downloading it. Useful for testing local builds of the SDK.
 
 uFBT stores its state in `.ufbt` subfolder in your home directory. You can override this location by setting `UFBT_HOME` environment variable.
 

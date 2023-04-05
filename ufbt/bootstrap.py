@@ -58,17 +58,6 @@ class BaseSdkLoader:
     def __init__(self, download_dir: str):
         self._download_dir = download_dir
 
-    # Returns local FS path. Downloads file if necessary
-    def get_sdk_component(self, target: str) -> str:
-        raise NotImplementedError()
-
-    def get_metadata(self) -> Dict[str, str]:
-        raise NotImplementedError()
-
-    @staticmethod
-    def metadata_to_init_kwargs(metadata: dict) -> Dict[str, str]:
-        raise NotImplementedError()
-
     def _open_url(self, url: str):
         request = Request(url, headers={"User-Agent": self.USER_AGENT})
         return urlopen(request, context=self._SSL_CONTEXT)
@@ -86,6 +75,30 @@ class BaseSdkLoader:
 
         return file_path
 
+    # Returns local FS path. Downloads file if necessary
+    def get_sdk_component(self, target: str) -> str:
+        raise NotImplementedError()
+
+    # Constructs metadata dict from loader-specific data
+    def get_metadata(self) -> Dict[str, str]:
+        raise NotImplementedError()
+
+    # Reconstruction of loader-specific data from metadata dict
+    @classmethod
+    def metadata_to_init_kwargs(cls, metadata: dict) -> Dict[str, str]:
+        raise NotImplementedError()
+
+    # Conversion of argparse.Namespace to metadata dict
+    @classmethod
+    def args_namespace_to_metadata(
+        cls, namespace: argparse.Namespace
+    ) -> Dict[str, str]:
+        raise NotImplementedError()
+
+    @classmethod
+    def add_args_to_mode_group(cls, mode_group):
+        raise NotImplementedError()
+
 
 class BranchSdkLoader(BaseSdkLoader):
     """
@@ -93,6 +106,7 @@ class BranchSdkLoader(BaseSdkLoader):
     Uses HTML parsing of index page to find all files in the branch.
     """
 
+    LOADER_MODE_KEY = "branch"
     UPDATE_SERVER_BRANCH_ROOT = "https://update.flipperzero.one/builds/firmware"
 
     class LinkExtractor(HTMLParser):
@@ -120,10 +134,10 @@ class BranchSdkLoader(BaseSdkLoader):
                             f"Found multiple versions: {self.version} and {version}"
                         )
 
-    def __init__(self, download_dir: str, branch: str, index_url: str = None):
+    def __init__(self, download_dir: str, branch: str, branch_root_url: str = None):
         super().__init__(download_dir)
         self._branch = branch
-        self._branch_root = index_url or self.UPDATE_SERVER_BRANCH_ROOT
+        self._branch_root = branch_root_url or self.UPDATE_SERVER_BRANCH_ROOT
         self._branch_url = f"{self._branch_root}/{branch}/"
         self._branch_files = {}
         self._version = None
@@ -140,26 +154,46 @@ class BranchSdkLoader(BaseSdkLoader):
             self._version = extractor.version
         log.info(f"Found version {self._version}")
 
-    def get_metadata(self) -> Dict[str, str]:
-        return {
-            "mode": "branch",
-            "branch": self._branch,
-            "version": self._version,
-            "index_url": self._branch_root,
-        }
-
-    @staticmethod
-    def metadata_to_init_kwargs(metadata: dict) -> Dict[str, str]:
-        return {
-            "branch": metadata["branch"],
-            "index_url": metadata.get("index_url", None),
-        }
-
     def get_sdk_component(self, target: str) -> str:
         if not (file_name := self._branch_files.get((FileType.SDK_ZIP, target), None)):
             raise ValueError(f"SDK bundle not found for {target}")
 
         return self._fetch_file(self._branch_url + file_name)
+
+    def get_metadata(self) -> Dict[str, str]:
+        return {
+            "mode": self.LOADER_MODE_KEY,
+            "branch": self._branch,
+            "version": self._version,
+            "branch_root": self._branch_root,
+        }
+
+    @classmethod
+    def metadata_to_init_kwargs(cls, metadata: dict) -> Dict[str, str]:
+        return {
+            "branch": metadata["branch"],
+            "branch_root_url": metadata.get(
+                "branch_root", BranchSdkLoader.UPDATE_SERVER_BRANCH_ROOT
+            ),
+        }
+
+    @classmethod
+    def args_namespace_to_metadata(
+        cls, namespace: argparse.Namespace
+    ) -> Dict[str, str]:
+        return {
+            "branch": namespace.branch,
+            "branch_root": namespace.index_url,
+        }
+
+    @classmethod
+    def add_args_to_mode_group(cls, mode_group):
+        mode_group.add_argument(
+            "--branch",
+            "-b",
+            type=str,
+            help="Branch to load SDK from",
+        )
 
 
 class UpdateChannelSdkLoader(BaseSdkLoader):
@@ -169,6 +203,7 @@ class UpdateChannelSdkLoader(BaseSdkLoader):
     Supports official update server and unofficial servers following the same format.
     """
 
+    LOADER_MODE_KEY = "channel"
     OFFICIAL_INDEX_URL = "https://update.flipperzero.one/firmware/directory.json"
 
     class UpdateChannel(enum.Enum):
@@ -177,40 +212,21 @@ class UpdateChannelSdkLoader(BaseSdkLoader):
         RELEASE = "release"
 
     def __init__(
-        self, download_dir: str, channel: UpdateChannel, index_url: str = None
+        self, download_dir: str, channel: UpdateChannel, index_html_url: str = None
     ):
         super().__init__(download_dir)
         self.channel = channel
-        self.index_url = index_url or self.OFFICIAL_INDEX_URL
+        self.index_html_url = index_html_url or self.OFFICIAL_INDEX_URL
         self.version_info = self._fetch_version(self.channel)
 
-    def get_sdk_component(self, target: str) -> str:
-        file_info = self._get_file_info(self.version_info, FileType.SDK_ZIP, target)
-        if not (file_url := file_info.get("url", None)):
-            raise ValueError(f"Invalid file url")
-
-        return self._fetch_file(file_url)
-
-    def get_metadata(self) -> Dict[str, str]:
-        return {
-            "mode": "channel",
-            "channel": self.channel.name.lower(),
-            "index_url": self.index_url,
-            "version": self.version_info["version"],
-        }
-
-    @staticmethod
-    def metadata_to_init_kwargs(metadata: dict) -> Dict[str, str]:
-        return {
-            "channel": UpdateChannelSdkLoader.UpdateChannel[
-                metadata["channel"].upper()
-            ],
-            "index_url": metadata.get("index_url", None),
-        }
-
     def _fetch_version(self, channel: UpdateChannel) -> dict:
-        log.info(f"Fetching version info for {channel} from {self.index_url}")
-        data = json.loads(self._open_url(self.index_url).read().decode("utf-8"))
+        log.info(f"Fetching version info for {channel} from {self.index_html_url}")
+        try:
+            data = json.loads(
+                self._open_url(self.index_html_url).read().decode("utf-8")
+            )
+        except json.decoder.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON: {e}")
 
         if not (channels := data.get("channels", [])):
             raise ValueError(f"Invalid channel: {channel}")
@@ -245,11 +261,56 @@ class UpdateChannelSdkLoader(BaseSdkLoader):
 
         return file_info
 
+    def get_sdk_component(self, target: str) -> str:
+        file_info = self._get_file_info(self.version_info, FileType.SDK_ZIP, target)
+        if not (file_url := file_info.get("url", None)):
+            raise ValueError(f"Invalid file url")
+
+        return self._fetch_file(file_url)
+
+    def get_metadata(self) -> Dict[str, str]:
+        return {
+            "mode": self.LOADER_MODE_KEY,
+            "channel": self.channel.name.lower(),
+            "index_html": self.index_html_url,
+            "version": self.version_info["version"],
+        }
+
+    @classmethod
+    def metadata_to_init_kwargs(cls, metadata: dict) -> Dict[str, str]:
+        return {
+            "channel": UpdateChannelSdkLoader.UpdateChannel[
+                metadata["channel"].upper()
+            ],
+            "index_html_url": metadata.get("index_html", None),
+        }
+
+    @classmethod
+    def args_namespace_to_metadata(
+        cls, namespace: argparse.Namespace
+    ) -> Dict[str, str]:
+        return {
+            "channel": namespace.channel,
+            "index_html": namespace.index_url,
+        }
+
+    @classmethod
+    def add_args_to_mode_group(cls, mode_group):
+        mode_group.add_argument(
+            "--channel",
+            "-c",
+            type=str,
+            help="Channel to load SDK from",
+            choices=[c.name.lower() for c in cls.UpdateChannel],
+        )
+
 
 class UrlSdkLoader(BaseSdkLoader):
     """
     Loads SDK from a static URL. Does not extract version info.
     """
+
+    LOADER_MODE_KEY = "url"
 
     def __init__(self, download_dir: str, url: str):
         super().__init__(download_dir)
@@ -260,11 +321,78 @@ class UrlSdkLoader(BaseSdkLoader):
         return self._fetch_file(self.url)
 
     def get_metadata(self) -> Dict[str, str]:
-        return {"mode": "url", "url": self.url, "version": self.VERSION_UNKNOWN}
+        return {
+            "mode": self.LOADER_MODE_KEY,
+            "url": self.url,
+            "version": self.VERSION_UNKNOWN,
+        }
 
-    @staticmethod
-    def metadata_to_init_kwargs(metadata: dict) -> Dict[str, str]:
+    @classmethod
+    def metadata_to_init_kwargs(cls, metadata: dict) -> Dict[str, str]:
         return {"url": metadata["url"]}
+
+    @classmethod
+    def args_namespace_to_metadata(
+        cls, namespace: argparse.Namespace
+    ) -> Dict[str, str]:
+        return {"url": namespace.url}
+
+    @classmethod
+    def add_args_to_mode_group(cls, mode_group):
+        mode_group.add_argument(
+            "--url",
+            "-u",
+            type=str,
+            help="Direct URL to load SDK from",
+        )
+
+
+class LocalSdkLoader(BaseSdkLoader):
+    """
+    Loads SDK from a file in filesystem. Does not extract version info.
+    """
+
+    LOADER_MODE_KEY = "local"
+
+    def __init__(self, download_dir: str, file_path: str):
+        super().__init__(download_dir)
+        self.file_path = file_path
+
+    def get_sdk_component(self, target: str) -> str:
+        log.info(f"Loading SDK from {self.file_path}")
+        return self.file_path
+
+    def get_metadata(self) -> Dict[str, str]:
+        return {
+            "mode": self.LOADER_MODE_KEY,
+            "file_path": self.file_path,
+            "version": self.VERSION_UNKNOWN,
+        }
+
+    @classmethod
+    def metadata_to_init_kwargs(cls, metadata: dict) -> Dict[str, str]:
+        return {"file_path": metadata["file_path"]}
+
+    @classmethod
+    def args_namespace_to_metadata(cls, args: argparse.Namespace) -> Dict[str, str]:
+        return {"file_path": args.local}
+
+    @classmethod
+    def add_args_to_mode_group(cls, mode_group):
+        mode_group.add_argument(
+            f"--local",
+            f"-l",
+            type=str,
+            help="Path to local SDK zip file",
+        )
+
+
+all_boostrap_loader_cls = (
+    BranchSdkLoader,
+    UpdateChannelSdkLoader,
+    UrlSdkLoader,
+    LocalSdkLoader,
+)
 
 
 ##############################################################################
@@ -307,24 +435,15 @@ class SdkDeployTask:
 
     @staticmethod
     def from_args(args: argparse.Namespace) -> "SdkDeployTask":
-        # TODO: unify construction for all modes?
         task = SdkDeployTask()
         task.hw_target = args.hw_target or SdkDeployTask.DEFAULT_HW_TARGET
         task.force = args.force
-        if args.branch:
-            task.mode = "branch"
-            task.all_params["branch"] = args.branch
-            if args.index_url:
-                task.all_params["index_url"] = args.index_url
-        elif args.channel:
-            task.mode = "channel"
-            task.all_params["channel"] = args.channel
-            if args.index_url:
-                task.all_params["index_url"] = args.index_url
-        elif args.url:
-            task.mode = "url"
-            task.all_params["url"] = args.url
-        task.all_params = vars(args)
+        for loader_cls in all_boostrap_loader_cls:
+            task.all_params.update(loader_cls.args_namespace_to_metadata(args))
+            if getattr(args, loader_cls.LOADER_MODE_KEY):
+                task.mode = loader_cls.LOADER_MODE_KEY
+                break
+        log.debug(f"deploy task from args: {task=}")
         return task
 
     @staticmethod
@@ -342,13 +461,10 @@ class SdkLoaderFactory:
     def create_for_task(task: SdkDeployTask, download_dir: str) -> BaseSdkLoader:
         log.debug(f"SdkLoaderFactory::create_for_task {task=}")
         loader_cls = None
-        if task.mode == "branch":
-            loader_cls = BranchSdkLoader
-        elif task.mode == "channel":
-            loader_cls = UpdateChannelSdkLoader
-        elif task.mode == "url":
-            loader_cls = UrlSdkLoader
-        else:
+        for loader_cls in all_boostrap_loader_cls:
+            if loader_cls.LOADER_MODE_KEY == task.mode:
+                break
+        if loader_cls is None:
             raise ValueError(f"Invalid mode: {task.mode}")
 
         ctor_kwargs = loader_cls.metadata_to_init_kwargs(task.all_params)
@@ -444,28 +560,6 @@ class UpdateSubcommand(CliSubcommand):
         super().__init__(self.COMMAND, "Update uFBT SDK")
 
     def _add_arguments(self, parser: argparse.ArgumentParser) -> None:
-        mode_group = parser.add_mutually_exclusive_group(required=False)
-        mode_group.add_argument(
-            "--url",
-            "-u",
-            help="URL to use",
-        )
-        mode_group.add_argument(
-            "--branch",
-            "-b",
-            help="Branch to use",
-        )
-        mode_group.add_argument(
-            "--channel",
-            "-c",
-            help="Update channel to use",
-            choices=list(
-                map(
-                    lambda s: s.lower(),
-                    UpdateChannelSdkLoader.UpdateChannel.__members__.keys(),
-                )
-            ),
-        )
         parser.add_argument(
             "--hw-target",
             "-t",
@@ -473,8 +567,11 @@ class UpdateSubcommand(CliSubcommand):
         )
         parser.add_argument(
             "--index-url",
-            help="URL to use for update channel",
+            help="URL to use for SDK discovery",
         )
+        mode_group = parser.add_mutually_exclusive_group(required=False)
+        for loader_cls in all_boostrap_loader_cls:
+            loader_cls.add_args_to_mode_group(mode_group)
 
     def _func(self, args) -> int:
         sdk_deployer = UfbtSdkDeployer(args.ufbt_home)
@@ -489,7 +586,6 @@ class UpdateSubcommand(CliSubcommand):
                 task_to_deploy = current_task
             else:
                 log.error("No previous SDK state was found, fetching latest release")
-                log.error("Please specify mode explicitly. See -h for details")
                 task_to_deploy = SdkDeployTask.default()
 
         if not sdk_deployer.deploy(task_to_deploy):
