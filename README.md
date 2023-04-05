@@ -2,19 +2,16 @@
 
 uFBT is a cross-platform tool for building applications for [Flipper Zero](https://flipperzero.one/). It is a simplified version of [Flipper Build Tool (FBT)](https://github.com/flipperdevices/flipperzero-firmware/blob/dev/documentation/fbt.md).
 
-uFBT enables basic development tasks for Flipper Zero, like building and debugging applications, flashing firmware, creating VSCode development configurations. It uses prebuilt binaries and libraries, so you don't need to build [the whole firmware](https://github.com/flipperdevices/flipperzero-firmware) to compile and debug your application for Flipper.
+uFBT enables basic development tasks for Flipper Zero, such as building and debugging applications, flashing firmware, creating VSCode development configurations. It uses prebuilt binaries and libraries, so you don't need to build [the whole firmware](https://github.com/flipperdevices/flipperzero-firmware) to compile and debug your application for Flipper.
 
 ## Installation
 
 - **Linux & macOS**: `python3 -m pip install --upgrade ufbt`
 - **Windows**: `py -m pip install --upgrade ufbt`
 
-uFBT uses your system's Python for running bootstrap code. Minimal supported Python version is 3.8.
+uFBT uses your system's Python for running bootstrap code. Minimal supported version is **Python 3.8**. For executing actual build tasks, uFBT will download and use its own Python binaries and a toolchain built for your platform.
 
-
-When running actual build tasks, uFBT will download and use its own Python binaries and a toolchain for your platform.
-
-On first run, uFBT will download and install required SDK components from `dev` branch of official firmware. For more information on how to switch to a different version of the SDK, see [Managing the SDK](#managing-the-sdk) section.
+On first run, uFBT will download and install required SDK components from `release` update channel of official firmware. For more information on how to switch to a different version of the SDK, see [Managing the SDK](#managing-the-sdk) section.
 
 ## Usage
 
@@ -24,7 +21,7 @@ Run `ufbt` in the root directory of your application (the one with `application.
 
 You can upload and start your application on Flipper attached over  USB using `ufbt launch`. 
 
-To see other available commands and options, run `ufbt -h`.
+To see other available commands and options, see `ufbt -h`.
 
 ### Debugging
 
@@ -65,6 +62,6 @@ uFBT stores its state in `.ufbt` subfolder in your home directory. You can overr
 
 Updating the SDK is handled by uFBT component called _bootstrap_. It has a dedicated entry point, `ufbt-bootstrap`, with additional options that might be useful in certain scenarios. Run `ufbt-bootstrap --help` to see them.
 
-### Troubleshooting
+## Troubleshooting
 
 If something goes wrong and uFBT state becomes corrupted, you can reset it by running `ufbt clean`. If that doesn't work, you can try removing `.ufbt` subfolder manually from your home folder.

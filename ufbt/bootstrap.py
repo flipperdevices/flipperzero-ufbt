@@ -19,9 +19,9 @@ from urllib.request import Request, urlopen
 from zipfile import ZipFile
 
 logging.basicConfig(
-    format="%(asctime)s [%(levelname)s] %(message)s",
+    format="%(asctime)s.%(msecs)03d [%(levelname).1s] %(message)s",
     level=logging.INFO,
-    datefmt="%Y-%m-%d %H:%M:%S",
+    datefmt="%H:%M:%S",
 )
 log = logging.getLogger(__name__)
 
@@ -462,15 +462,15 @@ def _clean(args) -> int:
 def _status(args) -> int:
     sdk_deployer = UfbtSdkDeployer(args.ufbt_dir)
     if previous_task := sdk_deployer.get_previous_task():
-        log.info(f"State dir: \t\t{sdk_deployer.ufbt_state_dir}")
-        log.info(f"SDK dir: \t\t{sdk_deployer.current_sdk_dir}")
-        log.info(f"Download dir: \t{sdk_deployer.download_dir}")
-        log.info(f"Target: \t\t{previous_task.hw_target}")
+        log.info(f"State dir\t{sdk_deployer.ufbt_state_dir}")
+        log.info(f"SDK dir\t\t{sdk_deployer.current_sdk_dir}")
+        log.info(f"Download dir\t{sdk_deployer.download_dir}")
+        log.info(f"Target\t\t{previous_task.hw_target}")
+        log.info(f"Mode\t\t{previous_task.mode}")
         log.info(
-            f"Version: \t\t{previous_task.all_params.get('version', BaseSdkLoader.VERSION_UNKNOWN)}"
+            f"Version\t\t{previous_task.all_params.get('version', BaseSdkLoader.VERSION_UNKNOWN)}"
         )
-        log.info(f"Mode: \t\t{previous_task.mode}")
-        log.info(f"Details: \t\t{previous_task.all_params}")
+        log.info(f"Details\t\t{previous_task.all_params}")
         return 0
     else:
         log.error("SDK is not deployed")
@@ -498,6 +498,12 @@ def main() -> Optional[int]:
         "--force",
         "-f",
         help="Force download",
+        action="store_true",
+        default=False,
+    )
+    root_parser.add_argument(
+        "--debug",
+        help="Enable debug logging",
         action="store_true",
         default=False,
     )
@@ -557,6 +563,9 @@ def main() -> Optional[int]:
     status_parser.set_defaults(func=_status)
 
     args = root_parser.parse_args()
+    if args.debug:
+        logging.getLogger().setLevel(logging.DEBUG)
+
     if args.no_check_certificate:
         # Temporary fix for SSL negotiation failure on Mac
         import ssl
@@ -574,8 +583,9 @@ def main() -> Optional[int]:
         return args.func(args)
 
     except Exception as e:
-        log.error(f"Failed to run operation: {e}")
-        # raise # Uncomment to get full stack trace
+        log.error(f"Failed to run operation: {e}. See --debug for details")
+        if args.debug:
+            raise
         return 2
 
 
