@@ -27,8 +27,6 @@ log = logging.getLogger(__name__)
 
 ##############################################################################
 
-bootstrap_subcommands = ("update", "status", "clean")
-
 
 class FileType(enum.Enum):
     SDK_ZIP = "sdk_zip"
@@ -438,8 +436,10 @@ class CliSubcommand:
 
 
 class UpdateSubcommand(CliSubcommand):
+    COMMAND = "update"
+
     def __init__(self):
-        super().__init__("update", "Update uFBT SDK")
+        super().__init__(self.COMMAND, "Update uFBT SDK")
 
     def _add_arguments(self, parser: argparse.ArgumentParser) -> None:
         mode_group = parser.add_mutually_exclusive_group(required=False)
@@ -496,8 +496,10 @@ class UpdateSubcommand(CliSubcommand):
 
 
 class CleanSubcommand(CliSubcommand):
+    COMMAND = "clean"
+
     def __init__(self):
-        super().__init__("clean", "Clean uFBT SDK state")
+        super().__init__(self.COMMAND, "Clean uFBT SDK state")
 
     def _add_arguments(self, parser: argparse.ArgumentParser):
         parser.add_argument(
@@ -532,8 +534,10 @@ class CleanSubcommand(CliSubcommand):
 
 
 class StatusSubcommand(CliSubcommand):
+    COMMAND = "status"
+
     def __init__(self):
-        super().__init__("status", "Show uFBT SDK status")
+        super().__init__(self.COMMAND, "Show uFBT SDK status")
 
     def _add_arguments(self, parser: argparse.ArgumentParser) -> None:
         pass
@@ -554,6 +558,13 @@ class StatusSubcommand(CliSubcommand):
         else:
             log.error("SDK is not deployed")
             return 1
+
+
+bootstrap_subcommand_classes = (UpdateSubcommand, CleanSubcommand, StatusSubcommand)
+
+bootstrap_subcommands = (
+    subcommand_cls.COMMAND for subcommand_cls in bootstrap_subcommand_classes
+)
 
 
 def bootstrap_cli() -> Optional[int]:
@@ -585,12 +596,8 @@ def bootstrap_cli() -> Optional[int]:
     )
 
     parsers = root_parser.add_subparsers()
-    for subcommand in [
-        UpdateSubcommand(),
-        CleanSubcommand(),
-        StatusSubcommand(),
-    ]:
-        subcommand.add_to_parser(parsers)
+    for subcommand_cls in bootstrap_subcommand_classes:
+        subcommand_cls().add_to_parser(parsers)
 
     args = root_parser.parse_args()
     if args.debug:

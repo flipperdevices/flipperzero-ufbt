@@ -15,7 +15,7 @@ def ufbt_cli():
     ufbt_state_dir = pathlib.Path(os.environ["UFBT_STATE_DIR"])
 
     # if any of bootstrap subcommands are in the arguments - call it instead
-    # kept for compatibility with old scripts, better use `ufbt-bootstrap`
+    # kept for compatibility with old scripts, better use `ufbt-bootstrap` directly
     if any(map(sys.argv.__contains__, bootstrap_subcommands)):
         return bootstrap_cli()
 
@@ -23,8 +23,9 @@ def ufbt_cli():
         bootstrap_cli()
 
     if not (ufbt_state_dir / "current" / "scripts" / "ufbt").exists():
-        print("SDK is missing scripts distribution.")
+        print("SDK is missing scripts distribution!")
         print("You might be trying to use an SDK in an outdated format.")
+        print("Run `ufbt update -h` for more information on how to update.")
         return 1
 
     UFBT_APP_DIR = os.getcwd()
