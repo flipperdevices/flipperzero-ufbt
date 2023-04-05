@@ -51,6 +51,7 @@ class BaseSdkLoader:
     """
 
     VERSION_UNKNOWN = "unknown"
+    ALWAYS_UPDATE_VERSIONS = [VERSION_UNKNOWN, "local"]
     USER_AGENT = "uFBT SDKLoader/0.2"
     _SSL_CONTEXT = None
 
@@ -119,10 +120,10 @@ class BranchSdkLoader(BaseSdkLoader):
                             f"Found multiple versions: {self.version} and {version}"
                         )
 
-    def __init__(self, download_dir: str, branch: str, branch_root_url: str = None):
+    def __init__(self, download_dir: str, branch: str, index_url: str = None):
         super().__init__(download_dir)
         self._branch = branch
-        self._branch_root = branch_root_url or self.UPDATE_SERVER_BRANCH_ROOT
+        self._branch_root = index_url or self.UPDATE_SERVER_BRANCH_ROOT
         self._branch_url = f"{self._branch_root}/{branch}/"
         self._branch_files = {}
         self._version = None
@@ -144,14 +145,14 @@ class BranchSdkLoader(BaseSdkLoader):
             "mode": "branch",
             "branch": self._branch,
             "version": self._version,
-            "branch_root_url": self._branch_root,
+            "index_url": self._branch_root,
         }
 
     @staticmethod
     def metadata_to_init_kwargs(metadata: dict) -> Dict[str, str]:
         return {
             "branch": metadata["branch"],
-            "branch_root_url": metadata.get("branch_root_url", None),
+            "index_url": metadata.get("index_url", None),
         }
 
     def get_sdk_component(self, target: str) -> str:
@@ -314,7 +315,7 @@ class SdkDeployTask:
             task.mode = "branch"
             task.all_params["branch"] = args.branch
             if args.index_url:
-                task.all_params["branch_root_url"] = args.index_url
+                task.all_params["index_url"] = args.index_url
         elif args.channel:
             task.mode = "channel"
             task.all_params["channel"] = args.channel
@@ -351,6 +352,7 @@ class SdkLoaderFactory:
             raise ValueError(f"Invalid mode: {task.mode}")
 
         ctor_kwargs = loader_cls.metadata_to_init_kwargs(task.all_params)
+        log.debug(f"SdkLoaderFactory::create_for_task {loader_cls=}, {ctor_kwargs=}")
         return loader_cls(download_dir, **ctor_kwargs)
 
 
@@ -382,8 +384,8 @@ class UfbtSdkDeployer:
             with open(self.state_file, "r") as f:
                 ufbt_state = json.load(f)
             # Check if we need to update
-            if ufbt_state.get("version") == sdk_loader.VERSION_UNKNOWN:
-                log.info("SDK is unversioned, updating")
+            if ufbt_state.get("version") in sdk_loader.ALWAYS_UPDATE_VERSIONS:
+                log.info("Cannot determine SDK version, updating")
             elif (
                 ufbt_state.get("version") == sdk_loader.get_metadata().get("version")
                 and ufbt_state.get("hw_target") == task.hw_target
@@ -589,8 +591,8 @@ def bootstrap_cli() -> Optional[int]:
         default=False,
     )
     root_parser.add_argument(
-        "--debug",
-        help="Enable debug logging",
+        "--verbose",
+        help="Enable extra logging",
         action="store_true",
         default=False,
     )
@@ -600,7 +602,7 @@ def bootstrap_cli() -> Optional[int]:
         subcommand_cls().add_to_parser(parsers)
 
     args = root_parser.parse_args()
-    if args.debug:
+    if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
 
     if args.no_check_certificate:
@@ -620,8 +622,8 @@ def bootstrap_cli() -> Optional[int]:
         return args.func(args)
 
     except Exception as e:
-        log.error(f"Failed to run operation: {e}. See --debug for details")
-        if args.debug:
+        log.error(f"Failed to run operation: {e}. See --verbose for details")
+        if args.verbose:
             raise
         return 2
 

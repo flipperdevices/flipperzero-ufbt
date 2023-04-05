@@ -65,3 +65,5 @@ Updating the SDK is handled by uFBT component called _bootstrap_. It has a dedic
 ## Troubleshooting
 
 If something goes wrong and uFBT state becomes corrupted, you can reset it by running `ufbt clean`. If that doesn't work, you can try removing `.ufbt` subfolder manually from your home folder.
+
+`ufbt-bootstrap` and SDK-related `ufbt` subcommands accept `--verbose` option that will print additional debug information.
