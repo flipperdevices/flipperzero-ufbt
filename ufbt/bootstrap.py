@@ -420,67 +420,143 @@ class UfbtSdkDeployer:
 ###############################################################################
 
 
-def _update(args) -> int:
-    sdk_deployer = UfbtSdkDeployer(args.ufbt_dir)
-    current_task = SdkDeployTask.from_args(args)
-    task_to_deploy = None
+class CliSubcommand:
+    def __init__(self, name: str, help: str):
+        self.name = name
+        self.help = help
 
-    if previous_task := sdk_deployer.get_previous_task():
-        previous_task.update_from(current_task)
-        task_to_deploy = previous_task
-    else:
-        if current_task.mode:
-            task_to_deploy = current_task
-        else:
-            log.error("No previous SDK state was found, fetching latest release")
-            log.error("Please specify mode explicitly. See -h for details")
-            task_to_deploy = SdkDeployTask.default()
+    def add_to_parser(self, parser: argparse.ArgumentParser):
+        subparser = parser.add_parser(self.name, help=self.help)
+        subparser.set_defaults(func=self._func)
+        self._add_arguments(subparser)
 
-    if not sdk_deployer.deploy(task_to_deploy):
-        return 1
-    return 0
+    def _func(args) -> int:
+        raise NotImplementedError
+
+    def _add_arguments(self, parser: argparse.ArgumentParser) -> None:
+        raise NotImplementedError
 
 
-def _clean(args) -> int:
-    sdk_deployer = UfbtSdkDeployer(args.ufbt_dir)
-    if args.purge:
-        log.info(f"Cleaning complete ufbt state in {sdk_deployer.ufbt_state_dir}")
-        shutil.rmtree(sdk_deployer.ufbt_state_dir, ignore_errors=True)
-        log.info("Done")
-        return
+class UpdateSubcommand(CliSubcommand):
+    def __init__(self):
+        super().__init__("update", "Update uFBT SDK")
 
-    if args.downloads:
-        log.info(f"Cleaning download dir {sdk_deployer.download_dir}")
-        shutil.rmtree(sdk_deployer.download_dir, ignore_errors=True)
-    else:
-        log.info(f"Cleaning SDK state in {sdk_deployer.current_sdk_dir}")
-        shutil.rmtree(sdk_deployer.current_sdk_dir, ignore_errors=True)
-    log.info("Done")
-    return 0
-
-
-def _status(args) -> int:
-    sdk_deployer = UfbtSdkDeployer(args.ufbt_dir)
-    if previous_task := sdk_deployer.get_previous_task():
-        log.info(f"State dir\t{sdk_deployer.ufbt_state_dir}")
-        log.info(f"SDK dir\t\t{sdk_deployer.current_sdk_dir}")
-        log.info(f"Download dir\t{sdk_deployer.download_dir}")
-        log.info(f"Target\t\t{previous_task.hw_target}")
-        log.info(f"Mode\t\t{previous_task.mode}")
-        log.info(
-            f"Version\t\t{previous_task.all_params.get('version', BaseSdkLoader.VERSION_UNKNOWN)}"
+    def _add_arguments(self, parser: argparse.ArgumentParser) -> None:
+        mode_group = parser.add_mutually_exclusive_group(required=False)
+        mode_group.add_argument(
+            "--url",
+            "-u",
+            help="URL to use",
         )
-        log.info(f"Details\t\t{previous_task.all_params}")
+        mode_group.add_argument(
+            "--branch",
+            "-b",
+            help="Branch to use",
+        )
+        mode_group.add_argument(
+            "--channel",
+            "-c",
+            help="Update channel to use",
+            choices=list(
+                map(
+                    lambda s: s.lower(),
+                    UpdateChannelSdkLoader.UpdateChannel.__members__.keys(),
+                )
+            ),
+        )
+        parser.add_argument(
+            "--hw-target",
+            "-t",
+            help="Hardware target",
+        )
+        parser.add_argument(
+            "--index-url",
+            help="URL to use for update channel",
+        )
+
+    def _func(self, args) -> int:
+        sdk_deployer = UfbtSdkDeployer(args.ufbt_home)
+        current_task = SdkDeployTask.from_args(args)
+        task_to_deploy = None
+
+        if previous_task := sdk_deployer.get_previous_task():
+            previous_task.update_from(current_task)
+            task_to_deploy = previous_task
+        else:
+            if current_task.mode:
+                task_to_deploy = current_task
+            else:
+                log.error("No previous SDK state was found, fetching latest release")
+                log.error("Please specify mode explicitly. See -h for details")
+                task_to_deploy = SdkDeployTask.default()
+
+        if not sdk_deployer.deploy(task_to_deploy):
+            return 1
         return 0
-    else:
-        log.error("SDK is not deployed")
-        return 1
 
 
-###############################################################################
+class CleanSubcommand(CliSubcommand):
+    def __init__(self):
+        super().__init__("clean", "Clean uFBT SDK state")
+
+    def _add_arguments(self, parser: argparse.ArgumentParser):
+        parser.add_argument(
+            "--downloads",
+            help="Clean downloads",
+            action="store_true",
+            default=False,
+        )
+        parser.add_argument(
+            "--purge",
+            help="Purge whole ufbt state",
+            action="store_true",
+            default=False,
+        )
+
+    def _func(self, args) -> int:
+        sdk_deployer = UfbtSdkDeployer(args.ufbt_home)
+        if args.purge:
+            log.info(f"Cleaning complete ufbt state in {sdk_deployer.ufbt_state_dir}")
+            shutil.rmtree(sdk_deployer.ufbt_state_dir, ignore_errors=True)
+            log.info("Done")
+            return
+
+        if args.downloads:
+            log.info(f"Cleaning download dir {sdk_deployer.download_dir}")
+            shutil.rmtree(sdk_deployer.download_dir, ignore_errors=True)
+        else:
+            log.info(f"Cleaning SDK state in {sdk_deployer.current_sdk_dir}")
+            shutil.rmtree(sdk_deployer.current_sdk_dir, ignore_errors=True)
+        log.info("Done")
+        return 0
 
 
-def main() -> Optional[int]:
+class StatusSubcommand(CliSubcommand):
+    def __init__(self):
+        super().__init__("status", "Show uFBT SDK status")
+
+    def _add_arguments(self, parser: argparse.ArgumentParser) -> None:
+        pass
+
+    def _func(self, args) -> int:
+        sdk_deployer = UfbtSdkDeployer(args.ufbt_home)
+        log.info(f"State dir     {sdk_deployer.ufbt_state_dir}")
+        log.info(f"Download dir  {sdk_deployer.download_dir}")
+        log.info(f"SDK dir       {sdk_deployer.current_sdk_dir}")
+        if previous_task := sdk_deployer.get_previous_task():
+            log.info(f"Target        {previous_task.hw_target}")
+            log.info(f"Mode          {previous_task.mode}")
+            log.info(
+                f"Version       {previous_task.all_params.get('version', BaseSdkLoader.VERSION_UNKNOWN)}"
+            )
+            log.info(f"Details       {previous_task.all_params}")
+            return 0
+        else:
+            log.error("SDK is not deployed")
+            return 1
+
+
+def bootstrap_cli() -> Optional[int]:
     root_parser = argparse.ArgumentParser()
     root_parser.add_argument(
         "--no-check-certificate",
@@ -489,7 +565,7 @@ def main() -> Optional[int]:
         default=False,
     )
     root_parser.add_argument(
-        "--ufbt-dir",
+        "--ufbt-home",
         "-d",
         help="uFBT state directory",
         default=os.environ.get("UFBT_HOME", os.path.expanduser("~/.ufbt")),
@@ -497,7 +573,7 @@ def main() -> Optional[int]:
     root_parser.add_argument(
         "--force",
         "-f",
-        help="Force download",
+        help="Force operation",
         action="store_true",
         default=False,
     )
@@ -509,58 +585,12 @@ def main() -> Optional[int]:
     )
 
     parsers = root_parser.add_subparsers()
-    checkout_parser = parsers.add_parser("update")
-    checkout_parser.set_defaults(func=_update)
-
-    mode_group = checkout_parser.add_mutually_exclusive_group(required=False)
-    mode_group.add_argument(
-        "--url",
-        "-u",
-        help="URL to use",
-    )
-    mode_group.add_argument(
-        "--branch",
-        "-b",
-        help="Branch to use",
-    )
-    mode_group.add_argument(
-        "--channel",
-        "-c",
-        help="Update channel to use",
-        choices=list(
-            map(
-                lambda s: s.lower(),
-                UpdateChannelSdkLoader.UpdateChannel.__members__.keys(),
-            )
-        ),
-    )
-    checkout_parser.add_argument(
-        "--hw-target",
-        "-t",
-        help="Hardware target",
-    )
-    checkout_parser.add_argument(
-        "--index-url",
-        help="URL to use for update channel",
-    )
-
-    clean_parser = parsers.add_parser("clean")
-    clean_parser.add_argument(
-        "--downloads",
-        help="Clean downloads",
-        action="store_true",
-        default=False,
-    )
-    clean_parser.add_argument(
-        "--purge",
-        help="Purge whole ufbt state",
-        action="store_true",
-        default=False,
-    )
-    clean_parser.set_defaults(func=_clean)
-
-    status_parser = parsers.add_parser("status")
-    status_parser.set_defaults(func=_status)
+    for subcommand in [
+        UpdateSubcommand(),
+        CleanSubcommand(),
+        StatusSubcommand(),
+    ]:
+        subcommand.add_to_parser(parsers)
 
     args = root_parser.parse_args()
     if args.debug:
@@ -590,4 +620,4 @@ def main() -> Optional[int]:
 
 
 if __name__ == "__main__":
-    sys.exit(main() or 0)
+    sys.exit(bootstrap_cli() or 0)

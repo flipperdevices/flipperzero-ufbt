@@ -3,11 +3,10 @@ import pathlib
 import platform
 import sys
 
-from .bootstrap import bootstrap_subcommands
-from .bootstrap import main as bootstrap_main
+from .bootstrap import bootstrap_cli, bootstrap_subcommands
 
 
-def ufbt_ep():
+def ufbt_cli():
     if not os.environ.get("UFBT_STATE_DIR"):
         os.environ["UFBT_STATE_DIR"] = os.path.expanduser("~/.ufbt")
     if not os.environ.get("FBT_TOOLCHAIN_PATH"):
@@ -15,13 +14,13 @@ def ufbt_ep():
 
     ufbt_state_dir = pathlib.Path(os.environ["UFBT_STATE_DIR"])
 
-    if any(
-        map(sys.argv.__contains__, bootstrap_subcommands)
-    ):  # if any of the subcommands are in the arguments
-        return bootstrap_main()
+    # if any of bootstrap subcommands are in the arguments - call it instead
+    # kept for compatibility with old scripts, better use `ufbt-bootstrap`
+    if any(map(sys.argv.__contains__, bootstrap_subcommands)):
+        return bootstrap_cli()
 
     if not os.path.exists(ufbt_state_dir):
-        bootstrap_main()
+        bootstrap_cli()
 
     if not (ufbt_state_dir / "current" / "scripts" / "ufbt").exists():
         print("SDK is missing scripts distribution.")
@@ -49,4 +48,4 @@ def ufbt_ep():
 
 
 if __name__ == "__main__":
-    sys.exit(ufbt_ep() or 0)
+    sys.exit(ufbt_cli() or 0)

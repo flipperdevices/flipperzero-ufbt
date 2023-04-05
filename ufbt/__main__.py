@@ -1,6 +1,6 @@
-from . import ufbt_ep
+from . import ufbt_cli
 
 if __name__ == "__main__":
     import sys
 
-    sys.exit(ufbt_ep() or 0)
+    sys.exit(ufbt_cli() or 0)

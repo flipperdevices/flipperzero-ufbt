@@ -21,7 +21,7 @@ Run `ufbt` in the root directory of your application (the one with `application.
 
 You can upload and start your application on Flipper attached over  USB using `ufbt launch`. 
 
-To see other available commands and options, see `ufbt -h`.
+To see other available commands and options, run `ufbt -h`.
 
 ### Debugging
 
@@ -55,7 +55,7 @@ To update the SDK, run `ufbt update`. This will download and install all require
 
 - uFBT can also download and update the SDK from any fixed URL. To do this, run `ufbt update --url=<url>`.
 
-uFBT stores its state in `.ufbt` subfolder in your home directory. You can override this location by setting `UFBT_DIR` environment variable.
+uFBT stores its state in `.ufbt` subfolder in your home directory. You can override this location by setting `UFBT_HOME` environment variable.
 
 
 ### ufbt-bootstrap
