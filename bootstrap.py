@@ -3,6 +3,7 @@ import enum
 import json
 import re
 import shutil
+import ssl
 import tarfile
 import argparse
 
@@ -23,6 +24,11 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 log = logging.getLogger(__name__)
+
+# Temporary fix for SSL negotiation failure on Mac
+_ssl_context = ssl.create_default_context()
+_ssl_context.check_hostname = False
+_ssl_context.verify_mode = ssl.CERT_NONE
 
 
 class FileType(enum.Enum):
@@ -45,10 +51,11 @@ class FileType(enum.Enum):
 class BaseSdkLoader:
     class SdkEntry(enum.Enum):
         SDK = "sdk"
-        SCRIPTS = "bin"
+        SCRIPTS = "scripts"
         LIB = "lib"
-        FW_ELF = "elf"
+        FW_ELF = "fwelf"
         FW_BIN = "fwbin"
+        FW_BUNDLE = "fwbundle"
 
     ANY_TARGET_FILE_TYPES = (
         FileType.CORE2_FIRMWARE_TGZ,
@@ -62,6 +69,7 @@ class BaseSdkLoader:
         SdkEntry.LIB: FileType.LIB_ZIP,
         SdkEntry.FW_ELF: FileType.FIRMWARE_ELF,
         SdkEntry.FW_BIN: FileType.FULL_BIN,
+        SdkEntry.FW_BUNDLE: FileType.UPDATE_TGZ,
     }
 
     def __init__(self, download_dir: str):
@@ -71,17 +79,22 @@ class BaseSdkLoader:
     def get_sdk_component(self, entry: SdkEntry, target: str):
         raise NotImplementedError()
 
+    def get_metadata(self):
+        raise NotImplementedError()
+
     def _fixup_target_type(self, file_type: FileType, target: str) -> str:
         return "any" if file_type in self.ANY_TARGET_FILE_TYPES else target
 
     def _fetch_file(self, url: str):
-        log.info(f"Fetching {url}")
+        log.debug(f"Fetching {url}")
         file_name = PurePosixPath(unquote(urlparse(url).path)).parts[-1]
         file_path = os.path.join(self._download_dir, file_name)
 
         os.makedirs(self._download_dir, exist_ok=True)
 
-        with urlopen(url) as response, open(file_path, "wb") as out_file:
+        with urlopen(url, context=_ssl_context) as response, open(
+            file_path, "wb"
+        ) as out_file:
             data = response.read()
             out_file.write(data)
 
@@ -95,30 +108,50 @@ class BranchSdkLoader(BaseSdkLoader):
         def reset(self):
             super().reset()
             self.files = {}
+            self.version = None
 
         def handle_starttag(self, tag, attrs):
             if tag == "a" and (href := dict(attrs).get("href", None)):
+                # .map files have special naming and we don't need them
+                if ".map" in href:
+                    return
                 if match := self.FILE_NAME_RE.match(href):
                     target, file_type, version, ext = match.groups()
                     file_type_str = f"{file_type}_{ext}".upper()
                     if file_type := FileType._member_map_.get(file_type_str, None):
                         self.files[(file_type, target)] = href
+                    if not self.version:
+                        self.version = version
+                    elif not version.startswith(self.version):
+                        raise RuntimeError(
+                            f"Found multiple versions: {self.version} and {version}"
+                        )
 
     def __init__(self, branch: str, download_dir: str):
         super().__init__(download_dir)
         self._branch = branch
         self._branch_url = f"https://update.flipperzero.one/builds/firmware/{branch}/"
         self._branch_files = {}
+        self._version = None
         self._fetch_branch()
 
     def _fetch_branch(self):
         # Fetch html index page with links to files
         log.info(f"Fetching branch index {self._branch_url}")
-        with urlopen(self._branch_url) as response:
+        with urlopen(self._branch_url, context=_ssl_context) as response:
             html = response.read().decode("utf-8")
             extractor = BranchSdkLoader.LinkExtractor()
             extractor.feed(html)
             self._branch_files = extractor.files
+            self._version = extractor.version
+        log.info(f"Found version {self._version}")
+
+    def get_metadata(self):
+        return {
+            "mode": "branch",
+            "branch": self._branch,
+            "version": self._version,
+        }
 
     def get_sdk_component(self, entry: BaseSdkLoader.SdkEntry, target: str):
         file_type = self.ENTRY_TO_FILE_TYPE[entry]
@@ -150,11 +183,18 @@ class UpdateChannelSdkLoader(BaseSdkLoader):
 
         return self._fetch_file(file_url)
 
+    def get_metadata(self):
+        return {
+            "mode": "channel",
+            "channel": self.channel.name.lower(),
+            "version": self.version_info["version"],
+        }
+
     @staticmethod
     def _fetch_version(channel: UpdateChannel):
         log.info(f"Fetching version info for {channel}")
         url = "https://update.flipperzero.one/firmware/directory.json"
-        data = json.loads(urlopen(url).read().decode("utf-8"))
+        data = json.loads(urlopen(url, context=_ssl_context).read().decode("utf-8"))
 
         channels = data.get("channels", [])
         if not channels:
@@ -191,36 +231,72 @@ class UpdateChannelSdkLoader(BaseSdkLoader):
         return file_info
 
 
-def deploy_sdk(target_dir: str, sdk_loader: BaseSdkLoader, hw_target: str):
+def deploy_sdk(target_dir: str, sdk_loader: BaseSdkLoader, hw_target: str, force: bool):
+    SDK_STATE_FILE_NAME = "sdk_state.json"
+
     sdk_layout = {
-        BaseSdkLoader.SdkEntry.SDK: "sdk",
-        BaseSdkLoader.SdkEntry.SCRIPTS: ".",
-        BaseSdkLoader.SdkEntry.LIB: "lib",
-        BaseSdkLoader.SdkEntry.FW_ELF: ".",
-        BaseSdkLoader.SdkEntry.FW_BIN: ".",
+        BaseSdkLoader.SdkEntry.SDK: ("sdk", None),
+        BaseSdkLoader.SdkEntry.SCRIPTS: (".", None),
+        BaseSdkLoader.SdkEntry.LIB: ("lib", None),
+        BaseSdkLoader.SdkEntry.FW_ELF: ("firmware.elf", None),
+        BaseSdkLoader.SdkEntry.FW_BIN: ("firmware.bin", None),
+        BaseSdkLoader.SdkEntry.FW_BUNDLE: (
+            ".",
+            lambda s: os.path.splitext(os.path.basename(s))[0].replace(
+                "flipper-z-", ""  # ugly
+            ),
+        ),
     }
+
+    log.info(f"uFBT state dir: {target_dir}")
+    if not force and os.path.exists(target_dir):
+        # Read existing state
+        with open(os.path.join(target_dir, SDK_STATE_FILE_NAME), "r") as f:
+            sdk_state = json.load(f)
+        # Check if we need to update
+        if (
+            sdk_state.get("meta", {}).get("version")
+            == sdk_loader.get_metadata().get("version")
+            and sdk_state.get("meta", {}).get("hw_target") == hw_target
+        ):
+            log.info("SDK is up-to-date")
+            return
 
     shutil.rmtree(target_dir, ignore_errors=True)
 
-    for entry, entry_dir in sdk_layout.items():
+    sdk_state = {
+        "meta": {"hw_target": hw_target, **sdk_loader.get_metadata()},
+        "components": {},
+    }
+    for entry, (entry_dir, entry_path_converter) in sdk_layout.items():
         log.info(f"Deploying {entry} to {entry_dir}")
         sdk_component_path = sdk_loader.get_sdk_component(entry, hw_target)
-        target_path = os.path.join(target_dir, entry_dir)
+        component_dst_path = os.path.join(target_dir, entry_dir)
         if sdk_component_path.endswith(".zip"):
             with ZipFile(sdk_component_path, "r") as zip_file:
-                zip_file.extractall(target_path)
+                zip_file.extractall(component_dst_path)
         elif sdk_component_path.endswith(".tgz"):
             with tarfile.open(sdk_component_path, "r:gz") as tar_file:
-                tar_file.extractall(target_path)
+                tar_file.extractall(component_dst_path)
         else:
-            shutil.copy2(sdk_component_path, target_path)
+            shutil.copy2(sdk_component_path, component_dst_path)
+
+        if entry_path_converter:
+            component_meta_path = entry_path_converter(sdk_component_path)
+        else:
+            component_meta_path = os.path.relpath(component_dst_path, target_dir)
+
+        sdk_state["components"][entry.value] = component_meta_path
+
+    with open(
+        os.path.join(target_dir, SDK_STATE_FILE_NAME),
+        "w",
+    ) as f:
+        json.dump(sdk_state, f, indent=4)
+    log.info("SDK deployed.")
 
 
 def main():
-    ufbt_work_dir = Path(".ufbt")
-    ufbt_download_dir = ufbt_work_dir / "download"
-    ufbt_state_dir = ufbt_work_dir / "current"
-
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--branch",
@@ -231,7 +307,12 @@ def main():
         "--channel",
         "-c",
         help="Update channel to use",
-        choices=UpdateChannelSdkLoader.UpdateChannel.__members__.keys(),
+        choices=list(
+            map(
+                lambda s: s.lower(),
+                UpdateChannelSdkLoader.UpdateChannel.__members__.keys(),
+            )
+        ),
     )
     parser.add_argument(
         "--hw-target",
@@ -240,26 +321,39 @@ def main():
         default="f7",
     )
     parser.add_argument(
-        "--download-dir",
+        "--ufbt-dir",
         "-d",
-        help="Downloads directory",
-        default=ufbt_download_dir.absolute(),
+        help="uFBT state directory",
+        default=".ufbt",
+    )
+    # Force flag
+    parser.add_argument(
+        "--force",
+        "-f",
+        help="Force download",
+        action="store_true",
+        default=False,
     )
     args = parser.parse_args()
+
+    ufbt_work_dir = Path(args.ufbt_dir)
+    ufbt_download_dir = ufbt_work_dir / "download"
+    ufbt_state_dir = ufbt_work_dir / "current"
 
     if args.branch and args.channel:
         parser.error("Only one of --branch and --channel can be specified")
 
     if args.branch:
-        sdk_loader = BranchSdkLoader(args.branch, args.download_dir)
+        sdk_loader = BranchSdkLoader(args.branch, ufbt_download_dir)
     elif args.channel:
         sdk_loader = UpdateChannelSdkLoader(
-            UpdateChannelSdkLoader.UpdateChannel[args.channel], args.download_dir
+            UpdateChannelSdkLoader.UpdateChannel[args.channel.upper()],
+            ufbt_download_dir,
         )
     else:
         parser.error("One of --branch or --channel must be specified")
 
-    deploy_sdk(ufbt_state_dir.absolute(), sdk_loader, args.hw_target)
+    deploy_sdk(ufbt_state_dir.absolute(), sdk_loader, args.hw_target, args.force)
 
 
 if __name__ == "__main__":
