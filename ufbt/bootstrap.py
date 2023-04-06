@@ -239,6 +239,7 @@ class UpdateChannelSdkLoader(BaseSdkLoader):
             raise ValueError(f"Empty channel: {channel}")
 
         log.info(f"Using version: {versions[0]['version']}")
+        log.debug(f"Changelog: {versions[0].get('changelog', 'None')}")
         return versions[0]
 
     @staticmethod
