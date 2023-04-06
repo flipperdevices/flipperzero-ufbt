@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools", "setuptools-git-versioning<2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ufbt"
+dynamic = ["version"]
+authors = [{ name = "Flipper Devices Inc.", email = "pypi@flipperdevices.com" }]
+description = "uFBT - micro Flipper Build Tool. Tool for building and developing applications (.fap) for Flipper Zero and its device family."
+readme = "README.md"
+requires-python = ">=3.8"
+keywords = ["ufbt", "flipperzero", "fbt", "stm32", "fap"]
+license = { text = "GPL-3.0" }
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: C",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Topic :: Software Development :: Build Tools",
+    "Topic :: Software Development :: Compilers",
+    "Topic :: Software Development :: Embedded Systems",
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+]
+
+
+[project.urls]
+homepage = "https://github.com/flipperdevices/flipperzero-ufbt"
+documentation = "https://github.com/flipperdevices/flipperzero-ufbt"
+repository = "https://github.com/flipperdevices/flipperzero-ufbt"
+issues = "https://github.com/flipperdevices/flipperzero-ufbt/issues"
+
+[project.scripts]
+ufbt = "ufbt:ufbt_cli"
+ufbt-bootstrap = "ufbt.bootstrap:bootstrap_cli"
+
+# https://setuptools-git-versioning.readthedocs.io/en/stable/schemas/file/dev_release_file.html#development-releases-prereleases-from-dev-branch
+[tool.setuptools-git-versioning]
+enabled = true
+version_file = "VERSION.txt"
+count_commits_from_version_file = true
+dev_template = "{tag}.dev{ccount}"
+dirty_template = "{tag}.dev{ccount}"
