@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools", "setuptools-git-versioning<2"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "ufbt"
-version = "0.2.0b12"
+dynamic = ["version"]
 authors = [{ name = "Flipper Devices Inc.", email = "pypi@flipperdevices.com" }]
 description = "uFBT - micro Flipper Build Tool. Tool for building and developing applications (.fap) for Flipper Zero and its device family."
 readme = "README.md"
@@ -36,3 +36,11 @@ issues = "https://github.com/flipperdevices/flipperzero-ufbt/issues"
 [project.scripts]
 ufbt = "ufbt:ufbt_cli"
 ufbt-bootstrap = "ufbt.bootstrap:bootstrap_cli"
+
+# https://setuptools-git-versioning.readthedocs.io/en/stable/schemas/file/dev_release_file.html#development-releases-prereleases-from-dev-branch
+[tool.setuptools-git-versioning]
+enabled = true
+version_file = "VERSION.txt"
+count_commits_from_version_file = true
+dev_template = "{tag}.dev{ccount}"
+dirty_template = "{tag}.dev{ccount}"
