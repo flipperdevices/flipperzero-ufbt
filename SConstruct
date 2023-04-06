@@ -1,12 +1,10 @@
 from SCons.Platform import TempFileMunge
-from fbt.util import tempfile_arg_esc_func, single_quote, wrap_tempfile
-from fbt.appmanifest import FlipperAppType
-
+from SCons.Node import FS
 
 import os
 import multiprocessing
-import json
-from functools import reduce
+import pathlib
+
 
 DefaultEnvironment(tools=[])
 
@@ -14,26 +12,10 @@ EnsurePythonVersion(3, 8)
 
 SetOption("num_jobs", multiprocessing.cpu_count())
 SetOption("max_drift", 1)
+# SetOption("silent", False)
 
 
-sdk_root = Dir("#.ufbt/current/sdk")
-sdk_data = {}
-with open(".ufbt/current/sdk/sdk.opts") as f:
-    sdk_json_data = json.load(f)
-    replacements = {
-        sdk_json_data["app_ep_subst"]: "${APP_ENTRY}",
-        sdk_json_data["sdk_path_subst"]: sdk_root.path.replace("\\", "/"),
-    }
-
-    for key, value in sdk_json_data.items():
-        if key in ("cc_args", "cpp_args", "linker_args", "linker_libs", "sdk_symbols"):
-            sdk_data[key] = reduce(
-                lambda a, kv: a.replace(*kv), replacements.items(), value
-            ).split(" ")
-        else:
-            sdk_data[key] = value
-
-# Repository("d:/tmp/apptest/VideoPoker")
+ufbt_variables = SConscript("site_scons/commandline.scons")
 
 forward_os_env = {
     # Import PATH from OS env - scons doesn't do that by default
@@ -55,18 +37,52 @@ variables_to_forward = [
     # Colors for tools
     "TERM",
 ]
-# FIXME
-# if proxy_env := GetOption("proxy_env"):
-#     variables_to_forward.extend(proxy_env.split(","))
+
+if proxy_env := GetOption("proxy_env"):
+    variables_to_forward.extend(proxy_env.split(","))
 
 for env_value_name in variables_to_forward:
     if environ_value := os.environ.get(env_value_name, None):
         forward_os_env[env_value_name] = environ_value
 
-
-env = Environment(
+# Core environment init - loads SDK state, sets up paths, etc.
+core_env = Environment(
+    variables=ufbt_variables,
     ENV=forward_os_env,
-    toolpath=["#.ufbt/current/scripts/fbt_tools"],
+    tools=[
+        "ufbt_state",
+        ("ufbt_help", {"vars": ufbt_variables}),
+    ],
+)
+
+
+if "update" in BUILD_TARGETS:
+    SConscript(
+        "site_scons/update.scons",
+        exports={"core_env": core_env},
+    )
+
+if "purge" in BUILD_TARGETS:
+    core_env.Execute(Delete(".ufbt"))
+    print("uFBT state purged")
+    Exit(0)
+
+# Now we can import stuff bundled with SDK - it was added to sys.path by ufbt_state
+
+from fbt.util import (
+    tempfile_arg_esc_func,
+    single_quote,
+    extract_abs_dir,
+    extract_abs_dir_path,
+    wrap_tempfile,
+    path_as_posix,
+)
+from fbt.appmanifest import FlipperAppType
+from fbt.sdk.cache import SdkCache
+
+# Base environment with all tools loaded from SDK
+env = core_env.Clone(
+    toolpath=[core_env["FBT_SCRIPT_DIR"].Dir("fbt_tools")],
     tools=[
         "fbt_tweaks",
         (
@@ -78,104 +94,290 @@ env = Environment(
         ),
         "fwbin",
         "python3",
-        "sconsmodular",
         "sconsrecursiveglob",
+        "sconsmodular",
         "ccache",
         "fbt_apps",
-        (
-            "fbt_extapps",
-            {
-                "EXT_APPS_WORK_DIR": "#.ufbt/build",
-            },
-        ),
+        "fbt_extapps",
         "fbt_assets",
+        ("compilation_db", {"COMPILATIONDB_COMSTR": "\tCDB\t${TARGET}"}),
     ],
-    VERBOSE=False,
-    FORCE=False,
+    FBT_FAP_DEBUG_ELF_ROOT=Dir("#.ufbt/build"),
     TEMPFILE=TempFileMunge,
     MAXLINELENGTH=2048,
     PROGSUFFIX=".elf",
     TEMPFILEARGESCFUNC=tempfile_arg_esc_func,
     SINGLEQUOTEFUNC=single_quote,
-    APPDIRS=[
-        ("", True),
-    ],
-    FBT_SCRIPT_DIR=Dir("#.ufbt/current/scripts"),
-    ROOT_DIR=Dir("#"),
-    FIRMWARE_BUILD_CFG="firmware",
-    SDK_DEFINITION=File(f"#{sdk_data['sdk_symbols'][0]}"),
-    TARGET_HW=int(sdk_data["hardware"]),
-    CFLAGS_APP=sdk_data["cc_args"],
-    CXXFLAGS_APP=sdk_data["cpp_args"],
-    LINKFLAGS_APP=sdk_data["linker_args"],
-    LIBS=sdk_data["linker_libs"],
-    LIBPATH=Dir("#.ufbt/current/lib"),
+    ABSPATHGETTERFUNC=extract_abs_dir_path,
     APPS=[],
+    UFBT_API_VERSION=SdkCache(
+        core_env.subst("$SDK_DEFINITION"), load_version_only=True
+    ).version,
+    APPCHECK_COMSTR="\tAPPCHK\t${SOURCE}\n\t\tTarget: ${TARGET_HW}, API: ${UFBT_API_VERSION}",
 )
 
 wrap_tempfile(env, "LINKCOM")
 wrap_tempfile(env, "ARCOM")
 
-env["CCCOM"] = env["CCCOM"].replace("$CFLAGS", "$CFLAGS_APP $CFLAGS")
-env["CXXCOM"] = env["CXXCOM"].replace("$CXXFLAGS", "$CXXFLAGS_APP $CXXFLAGS")
-env["LINKCOM"] = env["LINKCOM"].replace("$LINKFLAGS", "$LINKFLAGS_APP $LINKFLAGS")
-
-
 # print(env.Dump())
 
-env.LoadApplicationManifests()
-env.PrepareApplicationsBuild()
+# Dist env
 
-# print(env["APPMGR"].known_apps)
+dist_env = env.Clone(
+    tools=[
+        "fbt_dist",
+        "fbt_debugopts",
+        "openocd",
+        "blackmagic",
+        "jflash",
+        "textfile",
+    ],
+    ENV=os.environ,
+    OPENOCD_OPTS=[
+        "-f",
+        "interface/stlink.cfg",
+        "-c",
+        "transport select hla_swd",
+        "-f",
+        "${FBT_DEBUG_DIR}/stm32wbx.cfg",
+        "-c",
+        "stm32wbx.cpu configure -rtos auto",
+    ],
+)
+
+openocd_target = dist_env.OpenOCDFlash(
+    dist_env["UFBT_STATE_DIR"].File("flash"),
+    dist_env["FW_BIN"],
+    OPENOCD_COMMAND=[
+        "-c",
+        "program ${SOURCE.posix} reset exit 0x08000000",
+    ],
+)
+dist_env.Alias("firmware_flash", openocd_target)
+dist_env.Alias("flash", openocd_target)
+if env["FORCE"]:
+    env.AlwaysBuild(openocd_target)
+
+firmware_debug = dist_env.PhonyTarget(
+    "debug",
+    "${GDBPYCOM}",
+    source=dist_env["FW_ELF"],
+    GDBOPTS="${GDBOPTS_BASE}",
+    GDBREMOTE="${OPENOCD_GDB_PIPE}",
+    FBT_FAP_DEBUG_ELF_ROOT=path_as_posix(dist_env.subst("$FBT_FAP_DEBUG_ELF_ROOT")),
+)
+
+dist_env.PhonyTarget(
+    "blackmagic",
+    "${GDBPYCOM}",
+    source=dist_env["FW_ELF"],
+    GDBOPTS="${GDBOPTS_BASE} ${GDBOPTS_BLACKMAGIC}",
+    GDBREMOTE="${BLACKMAGIC_ADDR}",
+    FBT_FAP_DEBUG_ELF_ROOT=path_as_posix(dist_env.subst("$FBT_FAP_DEBUG_ELF_ROOT")),
+)
+
+dist_env.PhonyTarget(
+    "flash_blackmagic",
+    "$GDB $GDBOPTS $SOURCES $GDBFLASH",
+    source=dist_env["FW_ELF"],
+    GDBOPTS="${GDBOPTS_BASE} ${GDBOPTS_BLACKMAGIC}",
+    GDBREMOTE="${BLACKMAGIC_ADDR}",
+    GDBFLASH=[
+        "-ex",
+        "load",
+        "-ex",
+        "quit",
+    ],
+)
+
+flash_usb_full = dist_env.UsbInstall(
+    dist_env["UFBT_STATE_DIR"].File("usbinstall"),
+    [],
+)
+dist_env.AlwaysBuild(flash_usb_full)
+dist_env.Alias("flash_usb", flash_usb_full)
+dist_env.Alias("flash_usb_full", flash_usb_full)
+
+# App build environment
+
+appenv = env.Clone(
+    CCCOM=env["CCCOM"].replace("$CFLAGS", "$CFLAGS_APP $CFLAGS"),
+    CXXCOM=env["CXXCOM"].replace("$CXXFLAGS", "$CXXFLAGS_APP $CXXFLAGS"),
+    LINKCOM=env["LINKCOM"].replace("$LINKFLAGS", "$LINKFLAGS_APP $LINKFLAGS"),
+    COMPILATIONDB_USE_ABSPATH=True,
+)
+
+
+original_app_dir = Dir(appenv.subst("$UFBT_APP_DIR"))
+app_mount_point = Dir("#/app/")
+app_mount_point.addRepository(original_app_dir)
+
+appenv.LoadAppManifest(app_mount_point)
+appenv.PrepareApplicationsBuild()
+
+# print(appenv["APPMGR"].known_apps)
 
 #######################
 
-
-appenv = env.Clone()
-
-
-extapps = appenv["_extapps"] = {
-    "compact": {},
-    "debug": {},
-    "validators": {},
-    "dist": {},
-    "resources_dist": None,
-}
-
-
-def build_app_as_external(env, appdef):
-    compact_elf, debug_elf, validator = env.BuildAppElf(appdef)
-    extapps["compact"][appdef.appid] = compact_elf
-    extapps["debug"][appdef.appid] = debug_elf
-    extapps["validators"][appdef.appid] = validator
-    extapps["dist"][appdef.appid] = (appdef.fap_category, compact_elf)
-
+extapps = appenv["EXT_APPS"]
 
 apps_to_build_as_faps = [
     FlipperAppType.PLUGIN,
     FlipperAppType.EXTERNAL,
 ]
 
-for apptype in apps_to_build_as_faps:
-    for app in appenv["APPBUILD"].get_apps_of_type(apptype, True):
-        build_app_as_external(appenv, app)
+known_extapps = [
+    app
+    for apptype in apps_to_build_as_faps
+    for app in appenv["APPBUILD"].get_apps_of_type(apptype, True)
+]
+# print(f"Known external apps: {known_extapps}")
 
+for app in known_extapps:
+    app_artifacts = appenv.BuildAppElf(app)
+    app_src_dir = extract_abs_dir(app_artifacts.app._appdir)
+    app_artifacts.installer = [
+        appenv.Install(app_src_dir.Dir("dist"), app_artifacts.compact),
+        appenv.Install(app_src_dir.Dir("dist").Dir("debug"), app_artifacts.debug),
+    ]
 
 if appenv["FORCE"]:
-    appenv.AlwaysBuild(extapps["compact"].values())
+    appenv.AlwaysBuild([extapp.compact for extapp in extapps.values()])
 
-Alias("faps", extapps["compact"].values())
-Alias("faps", extapps["validators"].values())
+# Final steps - target aliases
 
-Default(extapps["validators"].values())
+install_and_check = [
+    (extapp.installer, extapp.validator) for extapp in extapps.values()
+]
+Alias(
+    "faps",
+    install_and_check,
+)
+Default(install_and_check)
+
+# Compilation database
+
+fwcdb = appenv.CompilationDatabase(
+    original_app_dir.Dir(".vscode").File("compile_commands.json")
+)
+
+AlwaysBuild(fwcdb)
+Precious(fwcdb)
+NoClean(fwcdb)
+if len(extapps):
+    Default(fwcdb)
 
 
-# if appsrc := appenv.subst("$APPSRC"):
-#     app_manifest, fap_file, app_validator = appenv.GetExtAppFromPath(appsrc)
-#     appenv.PhonyTarget(
-#         "launch_app",
-#         '${PYTHON3} scripts/runfap.py ${SOURCE} --fap_dst_dir "/ext/apps/${FAP_CATEGORY}"',
-#         source=fap_file,
-#         FAP_CATEGORY=app_manifest.fap_category,
-#     )
-#     appenv.Alias("launch_app", app_validator)
+# launch handler
+
+app_artifacts = None
+if len(extapps) == 1:
+    app_artifacts = list(extapps.values())[0]
+elif len(extapps) > 1:  # more than 1 app - try to find one with matching id
+    if appsrc := appenv.subst("$APPID"):
+        app_artifacts = appenv.GetExtAppFromPath(appsrc)
+
+if app_artifacts:
+    appenv.PhonyTarget(
+        "launch",
+        '${PYTHON3} "${APP_RUN_SCRIPT}" "${SOURCE}" --fap_dst_dir "/ext/apps/${FAP_CATEGORY}"',
+        source=app_artifacts.compact,
+        FAP_CATEGORY=app_artifacts.app.fap_category,
+    )
+    appenv.Alias("launch", app_artifacts.validator)
+
+# cli handler
+
+appenv.PhonyTarget(
+    "cli",
+    '${PYTHON3} "${FBT_SCRIPT_DIR}/serial_cli.py"',
+)
+
+# Linter
+
+dist_env.PhonyTarget(
+    "lint",
+    "${PYTHON3} ${FBT_SCRIPT_DIR}/lint.py check ${LINT_SOURCES}",
+    source=original_app_dir.File(".clang-format"),
+    LINT_SOURCES=[original_app_dir],
+)
+
+dist_env.PhonyTarget(
+    "format",
+    "${PYTHON3} ${FBT_SCRIPT_DIR}/lint.py format ${LINT_SOURCES}",
+    source=original_app_dir.File(".clang-format"),
+    LINT_SOURCES=[original_app_dir],
+)
+
+
+# Prepare vscode environment
+def _path_as_posix(path):
+    return pathlib.Path(path).as_posix()
+
+
+vscode_dist = []
+for template_file in dist_env.Glob("#project_template/.vscode/*"):
+    vscode_dist.append(
+        dist_env.Substfile(
+            original_app_dir.Dir(".vscode").File(template_file.name),
+            template_file,
+            SUBST_DICT={
+                "@UFBT_VSCODE_PATH_SEP@": os.path.pathsep,
+                "@UFBT_TOOLCHAIN_ARM_TOOLCHAIN_DIR@": pathlib.Path(
+                    dist_env.WhereIs("arm-none-eabi-gcc")
+                ).parent.as_posix(),
+                "@UFBT_TOOLCHAIN_GCC@": _path_as_posix(
+                    dist_env.WhereIs("arm-none-eabi-gcc")
+                ),
+                "@UFBT_TOOLCHAIN_GDB_PY@": _path_as_posix(
+                    dist_env.WhereIs("arm-none-eabi-gdb-py")
+                ),
+                "@UFBT_TOOLCHAIN_OPENOCD@": _path_as_posix(dist_env.WhereIs("openocd")),
+                "@UFBT_APP_DIR@": _path_as_posix(original_app_dir.abspath),
+                "@UFBT_ROOT_DIR@": _path_as_posix(Dir("#").abspath),
+                "@UFBT_DEBUG_DIR@": dist_env["FBT_DEBUG_DIR"],
+                "@UFBT_DEBUG_ELF_DIR@": _path_as_posix(
+                    dist_env["FBT_FAP_DEBUG_ELF_ROOT"].abspath
+                ),
+                "@UFBT_FIRMWARE_ELF@": _path_as_posix(dist_env["FW_ELF"].abspath),
+            },
+        )
+    )
+
+for config_file in dist_env.Glob("#/project_template/.*"):
+    if isinstance(config_file, FS.Dir):
+        continue
+    vscode_dist.append(dist_env.Install(original_app_dir, config_file))
+
+dist_env.Precious(vscode_dist)
+dist_env.NoClean(vscode_dist)
+dist_env.Alias("vscode_dist", vscode_dist)
+
+
+# Creating app from base template
+
+dist_env.SetDefault(FBT_APPID=appenv.subst("$APPID") or "template")
+app_template_dist = []
+for template_file in dist_env.Glob("#project_template/app_template/*"):
+    dist_file_name = dist_env.subst(template_file.name)
+    if template_file.name.endswith(".png"):
+        app_template_dist.append(
+            dist_env.InstallAs(original_app_dir.File(dist_file_name), template_file)
+        )
+    else:
+        app_template_dist.append(
+            dist_env.Substfile(
+                original_app_dir.File(dist_file_name),
+                template_file,
+                SUBST_DICT={
+                    "@FBT_APPID@": dist_env.subst("$FBT_APPID"),
+                },
+            )
+        )
+AddPostAction(
+    app_template_dist[-1],
+    Mkdir(original_app_dir.Dir("images")),
+)
+dist_env.Precious(app_template_dist)
+dist_env.NoClean(app_template_dist)
+dist_env.Alias("create", app_template_dist)
