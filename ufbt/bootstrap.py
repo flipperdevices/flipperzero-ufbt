@@ -244,7 +244,6 @@ class UpdateChannelSdkLoader(BaseSdkLoader):
 
     @staticmethod
     def _get_file_info(version_data: dict, file_type: FileType, file_target: str):
-
         if not (files := version_data.get("files", [])):
             raise ValueError(f"Empty files list")
 
@@ -709,7 +708,7 @@ def bootstrap_cli() -> Optional[int]:
         _ssl_context = ssl.create_default_context()
         _ssl_context.check_hostname = False
         _ssl_context.verify_mode = ssl.CERT_NONE
-        BaseSdkLoader.SSL_CONTEXT = _ssl_context
+        BaseSdkLoader._SSL_CONTEXT = _ssl_context
 
     if "func" not in args:
         root_parser.print_help()
