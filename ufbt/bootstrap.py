@@ -642,6 +642,17 @@ class CleanSubcommand(CliSubcommand):
 
 class StatusSubcommand(CliSubcommand):
     COMMAND = "status"
+    STATUS_FIELDS = {
+        "ufbt_version": "uFBT version",
+        "state_dir": "State dir",
+        "download_dir": "Download dir",
+        "sdk_dir": "SDK dir",
+        "target": "Target",
+        "mode": "Mode",
+        "version": "Version",
+        "details": "Details",
+        "error": "Error",
+    }
 
     def __init__(self):
         super().__init__(self.COMMAND, "Show uFBT SDK status")
@@ -656,24 +667,13 @@ class StatusSubcommand(CliSubcommand):
 
         parser.add_argument(
             "status_key",
-            help="Print only specific status key",
+            help="Print only a single value for a specific status key",
             nargs="?",
+            choices=self.STATUS_FIELDS.keys(),
         )
 
     def _func(self, args) -> int:
-        fields = {
-            "ufbt_version": "uFBT version",
-            "state_dir": "State dir",
-            "download_dir": "Download dir",
-            "sdk_dir": "SDK dir",
-            "target": "Target",
-            "mode": "Mode",
-            "version": "Version",
-            "details": "Details",
-            "error": "Error",
-        }
-
-        ufbt_version = self.get_ufbt_package_version()
+        ufbt_version = get_ufbt_package_version()
 
         sdk_deployer = UfbtSdkDeployer(args.ufbt_home)
         state_data = {
@@ -710,7 +710,7 @@ class StatusSubcommand(CliSubcommand):
                 print(json.dumps(state_data, indent=4))
             else:
                 for key, value in state_data.items():
-                    log.info(f"{fields[key]:<15} {value}")
+                    log.info(f"{self.STATUS_FIELDS[key]:<15} {value}")
 
         return 1 if state_data.get("error") else 0
 
