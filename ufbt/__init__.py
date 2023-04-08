@@ -3,7 +3,9 @@ import pathlib
 import platform
 import sys
 
-from .bootstrap import bootstrap_cli, bootstrap_subcommands
+from .bootstrap import bootstrap_cli, bootstrap_subcommands, get_ufbt_package_version
+
+__version__ = get_ufbt_package_version()
 
 
 def ufbt_cli():

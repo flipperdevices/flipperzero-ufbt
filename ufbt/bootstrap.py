@@ -17,6 +17,7 @@ from typing import ClassVar, Dict, Optional
 from urllib.parse import unquote, urlparse
 from urllib.request import Request, urlopen
 from zipfile import ZipFile
+from importlib.metadata import version
 
 logging.basicConfig(
     format="%(asctime)s.%(msecs)03d [%(levelname).1s] %(message)s",
@@ -26,6 +27,14 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 ##############################################################################
+
+
+def get_ufbt_package_version():
+    try:
+        return version("ufbt")
+    except Exception as e:
+        log.debug(f"Failed to get ufbt version: {e}")
+        return "unknown"
 
 
 class FileType(enum.Enum):
@@ -638,24 +647,72 @@ class StatusSubcommand(CliSubcommand):
         super().__init__(self.COMMAND, "Show uFBT SDK status")
 
     def _add_arguments(self, parser: argparse.ArgumentParser) -> None:
-        pass
+        parser.add_argument(
+            "--json",
+            help="Print status in JSON format",
+            action="store_true",
+            default=False,
+        )
+
+        parser.add_argument(
+            "status_key",
+            help="Print only specific status key",
+            nargs="?",
+        )
 
     def _func(self, args) -> int:
+        fields = {
+            "ufbt_version": "uFBT version",
+            "state_dir": "State dir",
+            "download_dir": "Download dir",
+            "sdk_dir": "SDK dir",
+            "target": "Target",
+            "mode": "Mode",
+            "version": "Version",
+            "details": "Details",
+            "error": "Error",
+        }
+
+        ufbt_version = self.get_ufbt_package_version()
+
         sdk_deployer = UfbtSdkDeployer(args.ufbt_home)
-        log.info(f"State dir     {sdk_deployer.ufbt_state_dir}")
-        log.info(f"Download dir  {sdk_deployer.download_dir}")
-        log.info(f"SDK dir       {sdk_deployer.current_sdk_dir}")
+        state_data = {
+            "ufbt_version": ufbt_version,
+            "state_dir": str(sdk_deployer.ufbt_state_dir.absolute()),
+            "download_dir": str(sdk_deployer.download_dir.absolute()),
+            "sdk_dir": str(sdk_deployer.current_sdk_dir.absolute()),
+        }
+
         if previous_task := sdk_deployer.get_previous_task():
-            log.info(f"Target        {previous_task.hw_target}")
-            log.info(f"Mode          {previous_task.mode}")
-            log.info(
-                f"Version       {previous_task.all_params.get('version', BaseSdkLoader.VERSION_UNKNOWN)}"
+            state_data.update(
+                {
+                    "target": previous_task.hw_target,
+                    "mode": previous_task.mode,
+                    "version": previous_task.all_params.get(
+                        "version", BaseSdkLoader.VERSION_UNKNOWN
+                    ),
+                    "details": previous_task.all_params,
+                }
             )
-            log.info(f"Details       {previous_task.all_params}")
-            return 0
         else:
-            log.error("SDK is not deployed")
-            return 1
+            state_data.update({"error": "SDK is not deployed"})
+
+        if key := args.status_key:
+            if key not in state_data:
+                log.error(f"Unknown status key {key}")
+                return 1
+            if args.json:
+                print(json.dumps(state_data[key], indent=4))
+            else:
+                print(state_data.get(key, ""))
+        else:
+            if args.json:
+                print(json.dumps(state_data, indent=4))
+            else:
+                for key, value in state_data.items():
+                    log.info(f"{fields[key]:<15} {value}")
+
+        return 1 if state_data.get("error") else 0
 
 
 bootstrap_subcommand_classes = (UpdateSubcommand, CleanSubcommand, StatusSubcommand)
