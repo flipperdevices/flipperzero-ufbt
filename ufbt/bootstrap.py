@@ -29,6 +29,14 @@ log = logging.getLogger(__name__)
 ##############################################################################
 
 
+def get_ufbt_package_version():
+    try:
+        return version("ufbt")
+    except Exception as e:
+        log.debug(f"Failed to get ufbt version: {e}")
+        return "unknown"
+
+
 class FileType(enum.Enum):
     SDK_ZIP = "sdk_zip"
     LIB_ZIP = "lib_zip"
@@ -665,11 +673,7 @@ class StatusSubcommand(CliSubcommand):
             "error": "Error",
         }
 
-        try:
-            ufbt_version = version("ufbt")
-        except Exception as e:
-            log.debug(f"Failed to get ufbt version: {e}")
-            ufbt_version = "unknown"
+        ufbt_version = self.get_ufbt_package_version()
 
         sdk_deployer = UfbtSdkDeployer(args.ufbt_home)
         state_data = {
