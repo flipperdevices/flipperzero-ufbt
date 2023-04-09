@@ -717,12 +717,12 @@ class StatusSubcommand(CliSubcommand):
                 log.error(f"Unknown status key {key}")
                 return 1
             if args.json:
-                print(json.dumps(state_data[key], indent=4))
+                print(json.dumps(state_data[key]))
             else:
                 print(state_data.get(key, ""))
         else:
             if args.json:
-                print(json.dumps(state_data, indent=4))
+                print(json.dumps(state_data))
             else:
                 for key, value in state_data.items():
                     log.info(f"{self.STATUS_FIELDS[key]:<15} {value}")
