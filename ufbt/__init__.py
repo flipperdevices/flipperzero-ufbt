@@ -74,7 +74,8 @@ def ufbt_cli():
         )
 
     # print(commandline)
-    return os.system(commandline)
+    retcode = os.system(commandline)
+    return 1 if retcode != 0 else 0
 
 
 if __name__ == "__main__":
