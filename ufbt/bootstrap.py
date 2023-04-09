@@ -34,14 +34,11 @@ from urllib.request import Request, urlopen
 from zipfile import ZipFile
 from importlib.metadata import version
 
-logging.basicConfig(
-    format="%(asctime)s.%(msecs)03d [%(levelname).1s] %(message)s",
-    level=logging.INFO,
-    datefmt="%H:%M:%S",
-)
-log = logging.getLogger(__name__)
 
 ##############################################################################
+
+log = logging.getLogger(__name__)
+DEFAULT_UFBT_HOME = os.path.expanduser("~/.ufbt")
 
 
 def get_ufbt_package_version():
@@ -236,18 +233,18 @@ class UpdateChannelSdkLoader(BaseSdkLoader):
         RELEASE = "release"
 
     def __init__(
-        self, download_dir: str, channel: UpdateChannel, index_html_url: str = None
+        self, download_dir: str, channel: UpdateChannel, json_index_url: str = None
     ):
         super().__init__(download_dir)
         self.channel = channel
-        self.index_html_url = index_html_url or self.OFFICIAL_INDEX_URL
+        self.json_index_url = json_index_url or self.OFFICIAL_INDEX_URL
         self.version_info = self._fetch_version(self.channel)
 
     def _fetch_version(self, channel: UpdateChannel) -> dict:
-        log.info(f"Fetching version info for {channel} from {self.index_html_url}")
+        log.info(f"Fetching version info for {channel} from {self.json_index_url}")
         try:
             data = json.loads(
-                self._open_url(self.index_html_url).read().decode("utf-8")
+                self._open_url(self.json_index_url).read().decode("utf-8")
             )
         except json.decoder.JSONDecodeError as e:
             raise ValueError(f"Invalid JSON: {e}")
@@ -296,7 +293,7 @@ class UpdateChannelSdkLoader(BaseSdkLoader):
         return {
             "mode": self.LOADER_MODE_KEY,
             "channel": self.channel.name.lower(),
-            "index_html": self.index_html_url,
+            "json_index": self.json_index_url,
             "version": self.version_info["version"],
         }
 
@@ -306,7 +303,7 @@ class UpdateChannelSdkLoader(BaseSdkLoader):
             "channel": UpdateChannelSdkLoader.UpdateChannel[
                 metadata["channel"].upper()
             ],
-            "index_html_url": metadata.get("index_html", None),
+            "json_index_url": metadata.get("json_index", None),
         }
 
     @classmethod
@@ -315,7 +312,7 @@ class UpdateChannelSdkLoader(BaseSdkLoader):
     ) -> Dict[str, str]:
         return {
             "channel": namespace.channel,
-            "index_html": namespace.index_url,
+            "json_index": namespace.index_url,
         }
 
     @classmethod
@@ -503,6 +500,10 @@ class UfbtSdkDeployer:
         self.ufbt_state_dir = Path(ufbt_state_dir)
         self.download_dir = self.ufbt_state_dir / "download"
         self.current_sdk_dir = self.ufbt_state_dir / "current"
+        self.toolchain_dir = (
+            Path(os.environ.get("FBT_TOOLCHAIN_PATH", self.ufbt_state_dir.absolute()))
+            / "toolchain"
+        )
         self.state_file = self.current_sdk_dir / self.UFBT_STATE_FILE_NAME
 
     def get_previous_task(self) -> Optional[SdkDeployTask]:
@@ -661,6 +662,7 @@ class StatusSubcommand(CliSubcommand):
         "ufbt_version": "uFBT version",
         "state_dir": "State dir",
         "download_dir": "Download dir",
+        "toolchain_dir": "Toolchain dir",
         "sdk_dir": "SDK dir",
         "target": "Target",
         "mode": "Mode",
@@ -696,6 +698,7 @@ class StatusSubcommand(CliSubcommand):
             "state_dir": str(sdk_deployer.ufbt_state_dir.absolute()),
             "download_dir": str(sdk_deployer.download_dir.absolute()),
             "sdk_dir": str(sdk_deployer.current_sdk_dir.absolute()),
+            "toolchain_dir": str(sdk_deployer.toolchain_dir.absolute()),
         }
 
         if previous_task := sdk_deployer.get_previous_task():
@@ -738,6 +741,12 @@ bootstrap_subcommands = (
 
 
 def bootstrap_cli() -> Optional[int]:
+    logging.basicConfig(
+        format="%(asctime)s.%(msecs)03d [%(levelname).1s] %(message)s",
+        level=logging.INFO,
+        datefmt="%H:%M:%S",
+    )
+
     root_parser = argparse.ArgumentParser()
     root_parser.add_argument(
         "--no-check-certificate",
@@ -749,7 +758,7 @@ def bootstrap_cli() -> Optional[int]:
         "--ufbt-home",
         "-d",
         help="uFBT state directory",
-        default=os.environ.get("UFBT_HOME", os.path.expanduser("~/.ufbt")),
+        default=os.environ.get("UFBT_HOME", DEFAULT_UFBT_HOME),
     )
     root_parser.add_argument(
         "--force",
