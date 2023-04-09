@@ -1,6 +1,21 @@
-###
-# Bootstrap script for uFBT. Deploys SDK and metadata.
-###
+#
+# Bootstrap script for uFBT. Deploys the SDK and metadata.
+# This file is part of uFBT <https://github.com/flipperdevices/flipperzero-ufbt>
+# Copyright (C) 2022-2023 Flipper Devices Inc.
+#
+#     This program is free software: you can redistribute it and/or modify
+#     it under the terms of the GNU General Public License as published by
+#     the Free Software Foundation, either version 3 of the License, or
+#     (at your option) any later version.
+#
+#     This program is distributed in the hope that it will be useful,
+#     but WITHOUT ANY WARRANTY; without even the implied warranty of
+#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#     GNU General Public License for more details.
+#
+#     You should have received a copy of the GNU General Public License
+#     along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
 
 import argparse
 import enum
@@ -702,12 +717,12 @@ class StatusSubcommand(CliSubcommand):
                 log.error(f"Unknown status key {key}")
                 return 1
             if args.json:
-                print(json.dumps(state_data[key], indent=4))
+                print(json.dumps(state_data[key]))
             else:
                 print(state_data.get(key, ""))
         else:
             if args.json:
-                print(json.dumps(state_data, indent=4))
+                print(json.dumps(state_data))
             else:
                 for key, value in state_data.items():
                     log.info(f"{self.STATUS_FIELDS[key]:<15} {value}")
