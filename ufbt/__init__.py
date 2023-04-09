@@ -22,15 +22,23 @@ import pathlib
 import platform
 import sys
 
-from .bootstrap import bootstrap_cli, bootstrap_subcommands, get_ufbt_package_version
+from .bootstrap import (
+    bootstrap_cli,
+    bootstrap_subcommands,
+    get_ufbt_package_version,
+    DEFAULT_UFBT_HOME,
+)
 
 __version__ = get_ufbt_package_version()
 
 
 def ufbt_cli():
-    if not os.environ.get("UFBT_STATE_DIR"):
-        os.environ["UFBT_STATE_DIR"] = os.path.expanduser("~/.ufbt")
+    if not os.environ.get("UFBT_HOME"):
+        os.environ["UFBT_HOME"] = DEFAULT_UFBT_HOME
+    # ufbt impl uses UFBT_STATE_DIR internally, not UFBT_HOME
+    os.environ["UFBT_STATE_DIR"] = os.environ["UFBT_HOME"]
     if not os.environ.get("FBT_TOOLCHAIN_PATH"):
+        # fbtenv.sh appends /toolchain/{PLATFORM} to FBT_TOOLCHAIN_PATH
         os.environ["FBT_TOOLCHAIN_PATH"] = os.environ["UFBT_STATE_DIR"]
 
     ufbt_state_dir = pathlib.Path(os.environ["UFBT_STATE_DIR"])
