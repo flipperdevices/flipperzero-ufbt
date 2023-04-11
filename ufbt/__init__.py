@@ -75,7 +75,10 @@ def ufbt_cli():
 
     # print(commandline)
     retcode = os.system(commandline)
-    return 1 if retcode != 0 else 0
+    if platform.system() != "Windows":
+        # low byte is signal number, high byte is exit code
+        retcode = retcode >> 8
+    return retcode
 
 
 if __name__ == "__main__":

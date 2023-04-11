@@ -526,7 +526,7 @@ class UfbtSdkDeployer:
                 ufbt_state = json.load(f)
             # Check if we need to update
             if ufbt_state.get("version") in sdk_loader.ALWAYS_UPDATE_VERSIONS:
-                log.info("Cannot determine SDK version, updating")
+                log.info("Cannot determine current SDK version, updating")
             elif (
                 ufbt_state.get("version") == sdk_loader.get_metadata().get("version")
                 and ufbt_state.get("hw_target") == task.hw_target
