@@ -1,6 +1,21 @@
-###
-# Bootstrap script for uFBT. Deploys SDK and metadata.
-###
+#
+# Bootstrap script for uFBT. Deploys the SDK and metadata.
+# This file is part of uFBT <https://github.com/flipperdevices/flipperzero-ufbt>
+# Copyright (C) 2022-2023 Flipper Devices Inc.
+#
+#     This program is free software: you can redistribute it and/or modify
+#     it under the terms of the GNU General Public License as published by
+#     the Free Software Foundation, either version 3 of the License, or
+#     (at your option) any later version.
+#
+#     This program is distributed in the hope that it will be useful,
+#     but WITHOUT ANY WARRANTY; without even the implied warranty of
+#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#     GNU General Public License for more details.
+#
+#     You should have received a copy of the GNU General Public License
+#     along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
 
 import argparse
 import enum
@@ -17,15 +32,21 @@ from typing import ClassVar, Dict, Optional
 from urllib.parse import unquote, urlparse
 from urllib.request import Request, urlopen
 from zipfile import ZipFile
+from importlib.metadata import version
 
-logging.basicConfig(
-    format="%(asctime)s.%(msecs)03d [%(levelname).1s] %(message)s",
-    level=logging.INFO,
-    datefmt="%H:%M:%S",
-)
-log = logging.getLogger(__name__)
 
 ##############################################################################
+
+log = logging.getLogger(__name__)
+DEFAULT_UFBT_HOME = os.path.expanduser("~/.ufbt")
+
+
+def get_ufbt_package_version():
+    try:
+        return version("ufbt")
+    except Exception as e:
+        log.debug(f"Failed to get ufbt version: {e}")
+        return "unknown"
 
 
 class FileType(enum.Enum):
@@ -212,18 +233,18 @@ class UpdateChannelSdkLoader(BaseSdkLoader):
         RELEASE = "release"
 
     def __init__(
-        self, download_dir: str, channel: UpdateChannel, index_html_url: str = None
+        self, download_dir: str, channel: UpdateChannel, json_index_url: str = None
     ):
         super().__init__(download_dir)
         self.channel = channel
-        self.index_html_url = index_html_url or self.OFFICIAL_INDEX_URL
+        self.json_index_url = json_index_url or self.OFFICIAL_INDEX_URL
         self.version_info = self._fetch_version(self.channel)
 
     def _fetch_version(self, channel: UpdateChannel) -> dict:
-        log.info(f"Fetching version info for {channel} from {self.index_html_url}")
+        log.info(f"Fetching version info for {channel} from {self.json_index_url}")
         try:
             data = json.loads(
-                self._open_url(self.index_html_url).read().decode("utf-8")
+                self._open_url(self.json_index_url).read().decode("utf-8")
             )
         except json.decoder.JSONDecodeError as e:
             raise ValueError(f"Invalid JSON: {e}")
@@ -244,7 +265,6 @@ class UpdateChannelSdkLoader(BaseSdkLoader):
 
     @staticmethod
     def _get_file_info(version_data: dict, file_type: FileType, file_target: str):
-
         if not (files := version_data.get("files", [])):
             raise ValueError(f"Empty files list")
 
@@ -273,7 +293,7 @@ class UpdateChannelSdkLoader(BaseSdkLoader):
         return {
             "mode": self.LOADER_MODE_KEY,
             "channel": self.channel.name.lower(),
-            "index_html": self.index_html_url,
+            "json_index": self.json_index_url,
             "version": self.version_info["version"],
         }
 
@@ -283,7 +303,7 @@ class UpdateChannelSdkLoader(BaseSdkLoader):
             "channel": UpdateChannelSdkLoader.UpdateChannel[
                 metadata["channel"].upper()
             ],
-            "index_html_url": metadata.get("index_html", None),
+            "json_index_url": metadata.get("json_index", None),
         }
 
     @classmethod
@@ -292,7 +312,7 @@ class UpdateChannelSdkLoader(BaseSdkLoader):
     ) -> Dict[str, str]:
         return {
             "channel": namespace.channel,
-            "index_html": namespace.index_url,
+            "json_index": namespace.index_url,
         }
 
     @classmethod
@@ -480,6 +500,10 @@ class UfbtSdkDeployer:
         self.ufbt_state_dir = Path(ufbt_state_dir)
         self.download_dir = self.ufbt_state_dir / "download"
         self.current_sdk_dir = self.ufbt_state_dir / "current"
+        self.toolchain_dir = (
+            Path(os.environ.get("FBT_TOOLCHAIN_PATH", self.ufbt_state_dir.absolute()))
+            / "toolchain"
+        )
         self.state_file = self.current_sdk_dir / self.UFBT_STATE_FILE_NAME
 
     def get_previous_task(self) -> Optional[SdkDeployTask]:
@@ -502,7 +526,7 @@ class UfbtSdkDeployer:
                 ufbt_state = json.load(f)
             # Check if we need to update
             if ufbt_state.get("version") in sdk_loader.ALWAYS_UPDATE_VERSIONS:
-                log.info("Cannot determine SDK version, updating")
+                log.info("Cannot determine current SDK version, updating")
             elif (
                 ufbt_state.get("version") == sdk_loader.get_metadata().get("version")
                 and ufbt_state.get("hw_target") == task.hw_target
@@ -634,29 +658,79 @@ class CleanSubcommand(CliSubcommand):
 
 class StatusSubcommand(CliSubcommand):
     COMMAND = "status"
+    STATUS_FIELDS = {
+        "ufbt_version": "uFBT version",
+        "state_dir": "State dir",
+        "download_dir": "Download dir",
+        "toolchain_dir": "Toolchain dir",
+        "sdk_dir": "SDK dir",
+        "target": "Target",
+        "mode": "Mode",
+        "version": "Version",
+        "details": "Details",
+        "error": "Error",
+    }
 
     def __init__(self):
         super().__init__(self.COMMAND, "Show uFBT SDK status")
 
     def _add_arguments(self, parser: argparse.ArgumentParser) -> None:
-        pass
+        parser.add_argument(
+            "--json",
+            help="Print status in JSON format",
+            action="store_true",
+            default=False,
+        )
+
+        parser.add_argument(
+            "status_key",
+            help="Print only a single value for a specific status key",
+            nargs="?",
+            choices=self.STATUS_FIELDS.keys(),
+        )
 
     def _func(self, args) -> int:
+        ufbt_version = get_ufbt_package_version()
+
         sdk_deployer = UfbtSdkDeployer(args.ufbt_home)
-        log.info(f"State dir     {sdk_deployer.ufbt_state_dir}")
-        log.info(f"Download dir  {sdk_deployer.download_dir}")
-        log.info(f"SDK dir       {sdk_deployer.current_sdk_dir}")
+        state_data = {
+            "ufbt_version": ufbt_version,
+            "state_dir": str(sdk_deployer.ufbt_state_dir.absolute()),
+            "download_dir": str(sdk_deployer.download_dir.absolute()),
+            "sdk_dir": str(sdk_deployer.current_sdk_dir.absolute()),
+            "toolchain_dir": str(sdk_deployer.toolchain_dir.absolute()),
+        }
+
         if previous_task := sdk_deployer.get_previous_task():
-            log.info(f"Target        {previous_task.hw_target}")
-            log.info(f"Mode          {previous_task.mode}")
-            log.info(
-                f"Version       {previous_task.all_params.get('version', BaseSdkLoader.VERSION_UNKNOWN)}"
+            state_data.update(
+                {
+                    "target": previous_task.hw_target,
+                    "mode": previous_task.mode,
+                    "version": previous_task.all_params.get(
+                        "version", BaseSdkLoader.VERSION_UNKNOWN
+                    ),
+                    "details": previous_task.all_params,
+                }
             )
-            log.info(f"Details       {previous_task.all_params}")
-            return 0
         else:
-            log.error("SDK is not deployed")
-            return 1
+            state_data.update({"error": "SDK is not deployed"})
+
+        if key := args.status_key:
+            if key not in state_data:
+                log.error(f"Unknown status key {key}")
+                return 1
+            if args.json:
+                print(json.dumps(state_data[key]))
+            else:
+                print(state_data.get(key, ""))
+        else:
+            if args.json:
+                print(json.dumps(state_data))
+            else:
+                for key, value in state_data.items():
+                    log.info(f"{self.STATUS_FIELDS[key]:<15} {value}")
+
+        return 1 if state_data.get("error") else 0
 
 
 bootstrap_subcommand_classes = (UpdateSubcommand, CleanSubcommand, StatusSubcommand)
@@ -667,6 +741,12 @@ bootstrap_subcommands = (
 
 
 def bootstrap_cli() -> Optional[int]:
+    logging.basicConfig(
+        format="%(asctime)s.%(msecs)03d [%(levelname).1s] %(message)s",
+        level=logging.INFO,
+        datefmt="%H:%M:%S",
+    )
+
     root_parser = argparse.ArgumentParser()
     root_parser.add_argument(
         "--no-check-certificate",
@@ -678,7 +758,7 @@ def bootstrap_cli() -> Optional[int]:
         "--ufbt-home",
         "-d",
         help="uFBT state directory",
-        default=os.environ.get("UFBT_HOME", os.path.expanduser("~/.ufbt")),
+        default=os.environ.get("UFBT_HOME", DEFAULT_UFBT_HOME),
     )
     root_parser.add_argument(
         "--force",
@@ -709,7 +789,7 @@ def bootstrap_cli() -> Optional[int]:
         _ssl_context = ssl.create_default_context()
         _ssl_context.check_hostname = False
         _ssl_context.verify_mode = ssl.CERT_NONE
-        BaseSdkLoader.SSL_CONTEXT = _ssl_context
+        BaseSdkLoader._SSL_CONTEXT = _ssl_context
 
     if "func" not in args:
         root_parser.print_help()
