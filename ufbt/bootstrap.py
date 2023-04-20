@@ -347,7 +347,7 @@ class UrlSdkLoader(BaseSdkLoader):
 
     @classmethod
     def args_namespace_to_metadata(cls, args: argparse.Namespace) -> Dict[str, str]:
-        if not args.hw_target:
+        if args.url and not args.hw_target:
             raise ValueError("HW target must be specified when using direct SDK URL")
         return {"url": args.url}
 
