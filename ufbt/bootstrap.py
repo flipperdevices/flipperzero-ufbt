@@ -27,13 +27,12 @@ import shutil
 import sys
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
+from importlib.metadata import version
 from pathlib import Path, PurePosixPath
 from typing import ClassVar, Dict, Optional
 from urllib.parse import unquote, urlparse
 from urllib.request import Request, urlopen
 from zipfile import ZipFile
-from importlib.metadata import version
-
 
 ##############################################################################
 
@@ -111,9 +110,7 @@ class BaseSdkLoader:
 
     # Conversion of argparse.Namespace to metadata dict
     @classmethod
-    def args_namespace_to_metadata(
-        cls, namespace: argparse.Namespace
-    ) -> Dict[str, str]:
+    def args_namespace_to_metadata(cls, args: argparse.Namespace) -> Dict[str, str]:
         raise NotImplementedError()
 
     @classmethod
@@ -199,12 +196,10 @@ class BranchSdkLoader(BaseSdkLoader):
         }
 
     @classmethod
-    def args_namespace_to_metadata(
-        cls, namespace: argparse.Namespace
-    ) -> Dict[str, str]:
+    def args_namespace_to_metadata(cls, args: argparse.Namespace) -> Dict[str, str]:
         return {
-            "branch": namespace.branch,
-            "branch_root": namespace.index_url,
+            "branch": args.branch,
+            "branch_root": args.index_url,
         }
 
     @classmethod
@@ -266,7 +261,7 @@ class UpdateChannelSdkLoader(BaseSdkLoader):
     @staticmethod
     def _get_file_info(version_data: dict, file_type: FileType, file_target: str):
         if not (files := version_data.get("files", [])):
-            raise ValueError(f"Empty files list")
+            raise ValueError("Empty files list")
 
         if not (
             file_info := next(
@@ -285,7 +280,7 @@ class UpdateChannelSdkLoader(BaseSdkLoader):
     def get_sdk_component(self, target: str) -> str:
         file_info = self._get_file_info(self.version_info, FileType.SDK_ZIP, target)
         if not (file_url := file_info.get("url", None)):
-            raise ValueError(f"Invalid file url")
+            raise ValueError("Invalid file url")
 
         return self._fetch_file(file_url)
 
@@ -307,12 +302,10 @@ class UpdateChannelSdkLoader(BaseSdkLoader):
         }
 
     @classmethod
-    def args_namespace_to_metadata(
-        cls, namespace: argparse.Namespace
-    ) -> Dict[str, str]:
+    def args_namespace_to_metadata(cls, args: argparse.Namespace) -> Dict[str, str]:
         return {
-            "channel": namespace.channel,
-            "json_index": namespace.index_url,
+            "channel": args.channel,
+            "json_index": args.index_url,
         }
 
     @classmethod
@@ -353,10 +346,10 @@ class UrlSdkLoader(BaseSdkLoader):
         return {"url": metadata["url"]}
 
     @classmethod
-    def args_namespace_to_metadata(
-        cls, namespace: argparse.Namespace
-    ) -> Dict[str, str]:
-        return {"url": namespace.url}
+    def args_namespace_to_metadata(cls, args: argparse.Namespace) -> Dict[str, str]:
+        if args.url and not args.hw_target:
+            raise ValueError("HW target must be specified when using direct SDK URL")
+        return {"url": args.url}
 
     @classmethod
     def add_args_to_mode_group(cls, mode_group):
@@ -396,13 +389,17 @@ class LocalSdkLoader(BaseSdkLoader):
 
     @classmethod
     def args_namespace_to_metadata(cls, args: argparse.Namespace) -> Dict[str, str]:
-        return {"file_path": args.local}
+        if args.local:
+            if not args.hw_target:
+                raise ValueError("HW target must be specified when using local SDK")
+            return {"file_path": str(Path(args.local).absolute())}
+        return {}
 
     @classmethod
     def add_args_to_mode_group(cls, mode_group):
         mode_group.add_argument(
-            f"--local",
-            f"-l",
+            "--local",
+            "-l",
             type=str,
             help="Path to local SDK zip file",
         )
@@ -547,7 +544,7 @@ class UfbtSdkDeployer:
             **sdk_loader.get_metadata(),
         }
 
-        log.info(f"Deploying SDK")
+        log.info("Deploying SDK")
 
         with ZipFile(sdk_component_path, "r") as zip_file:
             zip_file.extractall(sdk_target_dir)
