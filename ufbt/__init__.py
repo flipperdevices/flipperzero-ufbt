@@ -48,8 +48,8 @@ def ufbt_cli():
     if any(map(sys.argv.__contains__, bootstrap_subcommands)):
         return bootstrap_cli()
 
-    if not os.path.exists(ufbt_state_dir):
-        bootstrap_cli()
+    if not os.path.exists(ufbt_state_dir / "current"):
+        bootstrap_cli(["update"])
 
     if not (ufbt_state_dir / "current" / "scripts" / "ufbt").exists():
         print("SDK is missing scripts distribution!")
@@ -62,19 +62,17 @@ def ufbt_cli():
     if platform.system() == "Windows":
         commandline = (
             r'call "%UFBT_STATE_DIR%/current/scripts/toolchain/fbtenv.cmd" env & '
-            'python -m SCons -Q --warn=target-not-built '
+            "python -m SCons -Q --warn=target-not-built "
             r'-C "%UFBT_STATE_DIR%/current/scripts/ufbt" '
-            f'"UFBT_APP_DIR={UFBT_APP_DIR}" '
-            + " ".join(sys.argv[1:])
+            f'"UFBT_APP_DIR={UFBT_APP_DIR}" ' + " ".join(sys.argv[1:])
         )
 
     else:
         commandline = (
             '. "$UFBT_STATE_DIR/current/scripts/toolchain/fbtenv.sh" && '
-            'python3 -m SCons -Q --warn=target-not-built '
+            "python3 -m SCons -Q --warn=target-not-built "
             '-C "$UFBT_STATE_DIR/current/scripts/ufbt" '
-            f'"UFBT_APP_DIR={UFBT_APP_DIR}" '
-            + " ".join(sys.argv[1:])
+            f'"UFBT_APP_DIR={UFBT_APP_DIR}" ' + " ".join(sys.argv[1:])
         )
 
     # print(commandline)
