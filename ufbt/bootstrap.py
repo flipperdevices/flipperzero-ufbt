@@ -737,7 +737,7 @@ bootstrap_subcommands = (
 )
 
 
-def bootstrap_cli() -> Optional[int]:
+def bootstrap_cli(cmdline_args=None) -> Optional[int]:
     logging.basicConfig(
         format="%(asctime)s.%(msecs)03d [%(levelname).1s] %(message)s",
         level=logging.INFO,
@@ -775,7 +775,7 @@ def bootstrap_cli() -> Optional[int]:
     for subcommand_cls in bootstrap_subcommand_classes:
         subcommand_cls().add_to_parser(parsers)
 
-    args = root_parser.parse_args()
+    args = root_parser.parse_args(cmdline_args)
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
 
