@@ -427,7 +427,7 @@ class SdkDeployTask:
     mode: str = None
     all_params: Dict[str, str] = field(default_factory=dict)
 
-    DEFAULT_HW_TARGET: ClassVar[str] = "f7"
+    DEFAULT_HW_TARGET: ClassVar[str] = ""
 
     def update_from(self, other: "SdkDeployTask") -> None:
         log.debug(f"deploy task update from {other=}")
