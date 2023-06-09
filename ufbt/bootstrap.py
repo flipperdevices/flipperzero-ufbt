@@ -427,7 +427,7 @@ class SdkDeployTask:
     mode: str = None
     all_params: Dict[str, str] = field(default_factory=dict)
 
-    DEFAULT_HW_TARGET: ClassVar[str] = ""
+    DEFAULT_HW_TARGET: ClassVar[str] = "f7"
 
     def update_from(self, other: "SdkDeployTask") -> None:
         log.debug(f"deploy task update from {other=}")
@@ -454,7 +454,7 @@ class SdkDeployTask:
     @staticmethod
     def from_args(args: argparse.Namespace) -> "SdkDeployTask":
         task = SdkDeployTask()
-        task.hw_target = args.hw_target or SdkDeployTask.DEFAULT_HW_TARGET
+        task.hw_target = args.hw_target
         task.force = args.force
         for loader_cls in all_boostrap_loader_cls:
             task.all_params.update(loader_cls.args_namespace_to_metadata(args))
@@ -607,7 +607,7 @@ class UpdateSubcommand(CliSubcommand):
             if current_task.mode:
                 task_to_deploy = current_task
             else:
-                log.error("No previous SDK state was found, fetching latest release")
+                log.warn("No previous SDK state was found, fetching latest release")
                 task_to_deploy = SdkDeployTask.default()
 
         if not sdk_deployer.deploy(task_to_deploy):
@@ -637,6 +637,7 @@ class CleanSubcommand(CliSubcommand):
 
     def _func(self, args) -> int:
         sdk_deployer = UfbtSdkDeployer(args.ufbt_home)
+        log.info("If you want to clean build artifacts, use 'ufbt -c', not 'clean'")
         if args.purge:
             log.info(f"Cleaning complete ufbt state in {sdk_deployer.ufbt_state_dir}")
             shutil.rmtree(sdk_deployer.ufbt_state_dir, ignore_errors=True)
