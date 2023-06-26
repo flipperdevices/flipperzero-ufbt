@@ -607,7 +607,7 @@ class UpdateSubcommand(CliSubcommand):
             if current_task.mode:
                 task_to_deploy = current_task
             # No previous state, use default hw target
-            if not task_to_deploy.hw_target:
+            if task_to_deploy and not task_to_deploy.hw_target:
                 task_to_deploy.hw_target = SdkDeployTask.DEFAULT_HW_TARGET
             else:
                 log.warn("No previous SDK state was found, fetching latest release")
