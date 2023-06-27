@@ -597,25 +597,11 @@ class UpdateSubcommand(CliSubcommand):
 
     def _func(self, args) -> int:
         sdk_deployer = UfbtSdkDeployer(args.ufbt_home)
-        current_task = SdkDeployTask.from_args(args)
-        task_to_deploy = None
 
-        if previous_task := sdk_deployer.get_previous_task():
-            previous_task.update_from(current_task)
-            task_to_deploy = previous_task
-        else:
-            if current_task.mode:
-                task_to_deploy = current_task
-            # No previous state, use default hw target
-            if task_to_deploy and not task_to_deploy.hw_target:
-                task_to_deploy.hw_target = SdkDeployTask.DEFAULT_HW_TARGET
-            else:
-                log.warn("No previous SDK state was found, fetching latest release")
-                task_to_deploy = SdkDeployTask.default()
+        task_to_deploy = sdk_deployer.get_previous_task() or SdkDeployTask.default()
+        task_to_deploy.update_from(SdkDeployTask.from_args(args))
 
-        if not sdk_deployer.deploy(task_to_deploy):
-            return 1
-        return 0
+        return 0 if sdk_deployer.deploy(task_to_deploy) else 1
 
 
 class CleanSubcommand(CliSubcommand):
