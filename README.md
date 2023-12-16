@@ -15,6 +15,10 @@ uFBT uses your system's Python for running bootstrap code. Minimal supported ver
 
 On first run, uFBT will download and install required SDK components from `release` update channel of official firmware. For more information on how to switch to a different version of the SDK, see [Managing the SDK](#managing-the-sdk) section.
 
+### Using pyenv
+
+If you are using `pyenv` to manage python versions, after installation you may need to run `pyenv rehash` to generate [shim](https://github.com/pyenv/pyenv#understanding-shims) for `ufbt` command. 
+
 ## Usage
 
 ### Building & running your application
