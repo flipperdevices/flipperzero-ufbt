@@ -717,7 +717,10 @@ class StatusSubcommand(CliSubcommand):
                 for key, value in state_data.items():
                     log.info(f"{self.STATUS_FIELDS[key]:<15} {value}")
 
-        return 1 if state_data.get("error") else 0
+        if state_data.get("error"):
+            log.error("Status error: {}".format(state_data.get("error")))
+            return 1
+        return 0
 
 
 bootstrap_subcommand_classes = (UpdateSubcommand, CleanSubcommand, StatusSubcommand)
