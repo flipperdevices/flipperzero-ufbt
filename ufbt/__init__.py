@@ -23,11 +23,11 @@ import platform
 import sys
 
 from .bootstrap import (
+    DEFAULT_UFBT_HOME,
+    ENV_FILE_NAME,
     bootstrap_cli,
     bootstrap_subcommands,
     get_ufbt_package_version,
-    DEFAULT_UFBT_HOME,
-    ENV_FILE_NAME,
 )
 
 __version__ = get_ufbt_package_version()
