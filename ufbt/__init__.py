@@ -23,18 +23,50 @@ import platform
 import sys
 
 from .bootstrap import (
+    DEFAULT_UFBT_HOME,
+    ENV_FILE_NAME,
     bootstrap_cli,
     bootstrap_subcommands,
     get_ufbt_package_version,
-    DEFAULT_UFBT_HOME,
 )
 
 __version__ = get_ufbt_package_version()
 
 
+def _load_env_file(env_file):
+    """
+    Minimalistic implementation of env file parser.
+    Only supports lines in format `KEY=VALUE`.
+    Ignores comments (lines starting with #) and empty lines.
+    """
+    if not os.path.exists(env_file):
+        return {}
+    env_vars = {}
+    with open(env_file) as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            key, value = line.split("=", 1)
+            env_vars[key] = value
+    return env_vars
+
+
 def ufbt_cli():
+    # load environment variables from .env file in current directory
+    try:
+        env_vars = _load_env_file(ENV_FILE_NAME)
+        if env_vars:
+            os.environ.update(env_vars)
+    except Exception as e:
+        print(f"Failed to load environment variables from {ENV_FILE_NAME}: {e}")
+        return 2
+
     if not os.environ.get("UFBT_HOME"):
         os.environ["UFBT_HOME"] = DEFAULT_UFBT_HOME
+
+    os.environ["UFBT_HOME"] = os.path.abspath(os.environ["UFBT_HOME"])
+
     # ufbt impl uses UFBT_STATE_DIR internally, not UFBT_HOME
     os.environ["UFBT_STATE_DIR"] = os.environ["UFBT_HOME"]
     if not os.environ.get("FBT_TOOLCHAIN_PATH"):
