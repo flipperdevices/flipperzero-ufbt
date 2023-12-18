@@ -54,9 +54,13 @@ def _load_env_file(env_file):
 
 def ufbt_cli():
     # load environment variables from .env file in current directory
-    env_vars = _load_env_file(ENV_FILE_NAME)
-    if env_vars:
-        os.environ.update(env_vars)
+    try:
+        env_vars = _load_env_file(ENV_FILE_NAME)
+        if env_vars:
+            os.environ.update(env_vars)
+    except Exception as e:
+        print(f"Failed to load environment variables from {ENV_FILE_NAME}: {e}")
+        return 2
 
     if not os.environ.get("UFBT_HOME"):
         os.environ["UFBT_HOME"] = DEFAULT_UFBT_HOME
