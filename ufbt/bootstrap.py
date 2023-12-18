@@ -717,6 +717,7 @@ class StatusSubcommand(CliSubcommand):
         else:
             state_data.update({"error": "SDK is not deployed"})
 
+        skip_error_message = False
         if key := args.status_key:
             if key not in state_data:
                 log.error(f"Unknown status key {key}")
@@ -729,11 +730,12 @@ class StatusSubcommand(CliSubcommand):
             if args.json:
                 print(json.dumps(state_data))
             else:
+                skip_error_message = True
                 for key, value in state_data.items():
                     log.info(f"{self.STATUS_FIELDS[key]:<15} {value}")
 
-        if state_data.get("error"):
-            log.error("Status error:   {}".format(state_data.get("error")))
+        if state_data.get("error") and not skip_error_message:
+            log.error("Status error: {}".format(state_data.get("error")))
             return 1
         return 0
 
