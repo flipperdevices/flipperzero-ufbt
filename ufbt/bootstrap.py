@@ -733,7 +733,7 @@ class StatusSubcommand(CliSubcommand):
                     log.info(f"{self.STATUS_FIELDS[key]:<15} {value}")
 
         if state_data.get("error"):
-            log.error("Status error: {}".format(state_data.get("error")))
+            log.error("Status error:   {}".format(state_data.get("error")))
             return 1
         return 0
 
@@ -793,6 +793,7 @@ class LocalEnvSubcommand(CliSubcommand):
         env_sdk_deployer.ufbt_state_dir.mkdir(parents=True, exist_ok=True)
         if not args.no_link_toolchain:
             env_sdk_deployer.ufbt_state_dir.mkdir(parents=True, exist_ok=True)
+            default_sdk_deployer.toolchain_dir.mkdir(parents=True, exist_ok=True)
             self._link_dir(
                 str(env_sdk_deployer.toolchain_dir.absolute()),
                 str(default_sdk_deployer.toolchain_dir.absolute()),
