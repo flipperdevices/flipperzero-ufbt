@@ -734,8 +734,9 @@ class StatusSubcommand(CliSubcommand):
                 for key, value in state_data.items():
                     log.info(f"{self.STATUS_FIELDS[key]:<15} {value}")
 
-        if state_data.get("error") and not skip_error_message:
-            log.error("Status error: {}".format(state_data.get("error")))
+        if state_data.get("error"):
+            if not skip_error_message:
+                log.error("Status error: {}".format(state_data.get("error")))
             return 1
         return 0
 
