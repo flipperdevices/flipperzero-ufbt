@@ -80,3 +80,9 @@ Updating the SDK is handled by uFBT component called _bootstrap_. It has a dedic
 If something goes wrong and uFBT state becomes corrupted, you can reset it by running `ufbt clean`. If that doesn't work, you can try removing `.ufbt` subfolder manually from your home folder.
 
 `ufbt-bootstrap` and SDK-related `ufbt` subcommands accept `--verbose` option that will print additional debug information.
+
+## Contributing
+
+uFBT is a small tool and does not contain the actual implementation of build system, project templates or toolchain. It functions as a downloader and manager of SDK components that are packaged [alongside with Flipper firmware](https://github.com/flipperdevices/flipperzero-firmware/tree/dev/scripts/ufbt). 
+
+Issues and pull requests regarding `ufbt-bootstrap` features like SDK management should be reported to this project, and the rest - related to actual application development - to [Flipper firmware repo](https://github.com/flipperdevices/flipperzero-firmware/issues).
