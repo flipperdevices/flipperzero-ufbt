@@ -61,8 +61,15 @@ To update the SDK, run `ufbt update`. This will download and install all require
 - uFBT can also download and update the SDK from any **fixed URL**. To do this, run `ufbt update --url=<url>`.
 - To use a **local copy** of the SDK, run `ufbt update --local=<path>`. This will use the SDK located in `<path>` instead of downloading it. Useful for testing local builds of the SDK.
 
-uFBT stores its state in `.ufbt` subfolder in your home directory. You can override this location by setting `UFBT_HOME` environment variable.
+### Global and per-project SDK management
 
+By default, uFBT stores its state - SDK and toolchain - in `.ufbt` subfolder of your home directory. You can override this location by setting `UFBT_HOME` environment variable.
+
+uFBT also supports dotenv (`.env`) files, containing environment variable overrides for the project in current directory. Most commonly, you will want to use this to override the default state directory to a local one, so that your project could use a specific version and/or hardware target of the SDK. 
+
+You can enable dotenv mode for current directory by running `ufbt dotenv_create`. This will create `.env` file in current directory with default values, linking SDK state to `.ufbt` subfolder in current directory, and creating a symlink for toolchain to `.ufbt/toolchain` in your home directory. You can then edit `.env` file to further customize the environment. 
+
+You can also specify additional options when creating the `.env` file. See `ufbt dotenv_create --help` for more information.
 
 ### ufbt-bootstrap
 
@@ -73,3 +80,9 @@ Updating the SDK is handled by uFBT component called _bootstrap_. It has a dedic
 If something goes wrong and uFBT state becomes corrupted, you can reset it by running `ufbt clean`. If that doesn't work, you can try removing `.ufbt` subfolder manually from your home folder.
 
 `ufbt-bootstrap` and SDK-related `ufbt` subcommands accept `--verbose` option that will print additional debug information.
+
+## Contributing
+
+uFBT is a small tool and does not contain the actual implementation of build system, project templates or toolchain. It functions as a downloader and manager of SDK components that are packaged [alongside with Flipper firmware](https://github.com/flipperdevices/flipperzero-firmware/tree/dev/scripts/ufbt). 
+
+Issues and pull requests regarding `ufbt-bootstrap` features like SDK management should be reported to this project, and the rest - related to actual application development - to [Flipper firmware repo](https://github.com/flipperdevices/flipperzero-firmware/issues).
