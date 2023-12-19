@@ -31,9 +31,9 @@ To see other available commands and options, run `ufbt -h`.
 
 ### Debugging
 
-In order to debug your application, you need to be running the firmware distributed alongside with current SDK version. You can flash it to your Flipper using `ufbt flash` (over ST-Link), `ufbt flash_usb` (over USB) or `ufbt flash_blackmagic` (using Wi-Fi dev board running Blackmagic firmware).
+In order to debug your application, you need to be running the firmware distributed alongside with current SDK version. You can flash it to your Flipper using `ufbt flash` (using a supported SWD probe), `ufbt flash_usb` (over USB). 
 
-You can attach to running firmware using `ufbt debug` (for ST-Link) or `ufbt blackmagic` (for Wi-Fi dev board).
+For other flashing and debugging options, see `ufbt -h`.
 
 ### VSCode integration
 
@@ -48,7 +48,8 @@ Application manifests are explained in the [FBT documentation](https://github.co
 ### Other
 
  * `ufbt cli` starts a CLI session with the device;
- * `ufbt lint`, `ufbt format` run clang-format on application's sources.
+ * `ufbt lint`, `ufbt format` run clang-format on application's sources;
+ * You can temporarily add toolchain binaries (compiler, linter, OpenOCD and others) to your PATH. See `ufbt --help` for more information.
 
 ## Managing the SDK
 

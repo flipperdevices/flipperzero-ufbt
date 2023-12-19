@@ -794,13 +794,16 @@ class LocalEnvSubcommand(CliSubcommand):
         default_sdk_deployer = UfbtSdkDeployer(args.ufbt_home)
 
         env_sdk_deployer.ufbt_state_dir.mkdir(parents=True, exist_ok=True)
-        if not args.no_link_toolchain:
+        if args.no_link_toolchain:
+            log.info("Skipping toolchain directory linking")
+        else:
             env_sdk_deployer.ufbt_state_dir.mkdir(parents=True, exist_ok=True)
             default_sdk_deployer.toolchain_dir.mkdir(parents=True, exist_ok=True)
             self._link_dir(
                 str(env_sdk_deployer.toolchain_dir.absolute()),
                 str(default_sdk_deployer.toolchain_dir.absolute()),
             )
+            log.info("To use a local copy, specify --no-link-toolchain")
 
         env_vars = {
             "UFBT_HOME": args.state_dir,
@@ -811,6 +814,7 @@ class LocalEnvSubcommand(CliSubcommand):
             for key, value in env_vars.items():
                 f.write(f"{key}={value}\n")
 
+        log.info(f"Created {ENV_FILE_NAME} file in {os.getcwd()}")
         return 0
 
 
