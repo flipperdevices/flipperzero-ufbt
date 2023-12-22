@@ -22,6 +22,7 @@ import enum
 import json
 import logging
 import os
+import platform
 import re
 import shutil
 import sys
@@ -38,6 +39,8 @@ from zipfile import ZipFile
 
 log = logging.getLogger(__name__)
 DEFAULT_UFBT_HOME = os.path.expanduser("~/.ufbt")
+ENV_FILE_NAME = ".env"
+STATE_DIR_TOOLCHAIN_SUBDIR = "toolchain"
 
 
 def get_ufbt_package_version():
@@ -493,14 +496,19 @@ class SdkLoaderFactory:
 class UfbtSdkDeployer:
     UFBT_STATE_FILE_NAME = "ufbt_state.json"
 
-    def __init__(self, ufbt_state_dir: str):
+    def __init__(self, ufbt_state_dir: str, toolchain_dir: str = None):
         self.ufbt_state_dir = Path(ufbt_state_dir)
         self.download_dir = self.ufbt_state_dir / "download"
         self.current_sdk_dir = self.ufbt_state_dir / "current"
-        self.toolchain_dir = (
-            Path(os.environ.get("FBT_TOOLCHAIN_PATH", self.ufbt_state_dir.absolute()))
-            / "toolchain"
-        )
+        if toolchain_dir:
+            self.toolchain_dir = self.ufbt_state_dir / toolchain_dir
+        else:
+            self.toolchain_dir = (
+                Path(
+                    os.environ.get("FBT_TOOLCHAIN_PATH", self.ufbt_state_dir.absolute())
+                )
+                / STATE_DIR_TOOLCHAIN_SUBDIR
+            )
         self.state_file = self.current_sdk_dir / self.UFBT_STATE_FILE_NAME
 
     def get_previous_task(self) -> Optional[SdkDeployTask]:
@@ -582,6 +590,9 @@ class UpdateSubcommand(CliSubcommand):
         super().__init__(self.COMMAND, "Update uFBT SDK")
 
     def _add_arguments(self, parser: argparse.ArgumentParser) -> None:
+        parser.description = """Update uFBT SDK. By default uses the last used target and mode. 
+        Otherwise deploys latest release."""
+
         parser.add_argument(
             "--hw-target",
             "-t",
@@ -611,6 +622,8 @@ class CleanSubcommand(CliSubcommand):
         super().__init__(self.COMMAND, "Clean uFBT SDK state")
 
     def _add_arguments(self, parser: argparse.ArgumentParser):
+        parser.description = """Clean up uFBT internal state. By default cleans current SDK state.
+            For cleaning app build artifacts, use 'ufbt -c' instead."""
         parser.add_argument(
             "--downloads",
             help="Clean downloads",
@@ -662,6 +675,8 @@ class StatusSubcommand(CliSubcommand):
         super().__init__(self.COMMAND, "Show uFBT SDK status")
 
     def _add_arguments(self, parser: argparse.ArgumentParser) -> None:
+        parser.description = """Show uFBT status - deployment paths and SDK version."""
+
         parser.add_argument(
             "--json",
             help="Print status in JSON format",
@@ -702,6 +717,7 @@ class StatusSubcommand(CliSubcommand):
         else:
             state_data.update({"error": "SDK is not deployed"})
 
+        skip_error_message = False
         if key := args.status_key:
             if key not in state_data:
                 log.error(f"Unknown status key {key}")
@@ -714,13 +730,100 @@ class StatusSubcommand(CliSubcommand):
             if args.json:
                 print(json.dumps(state_data))
             else:
+                skip_error_message = True
                 for key, value in state_data.items():
                     log.info(f"{self.STATUS_FIELDS[key]:<15} {value}")
 
-        return 1 if state_data.get("error") else 0
+        if state_data.get("error"):
+            if not skip_error_message:
+                log.error("Status error: {}".format(state_data.get("error")))
+            return 1
+        return 0
 
 
-bootstrap_subcommand_classes = (UpdateSubcommand, CleanSubcommand, StatusSubcommand)
+class LocalEnvSubcommand(CliSubcommand):
+    COMMAND = "dotenv_create"
+
+    def __init__(self):
+        super().__init__(self.COMMAND, "Create a local environment for uFBT")
+
+    def _add_arguments(self, parser: argparse.ArgumentParser) -> None:
+        parser.description = f"""Create a dotenv ({ENV_FILE_NAME}) file in current directory with environment variables for uFBT.
+        Designed for per-project SDK management.
+        If {ENV_FILE_NAME} file already exists, this command will refuse to overwrite it.
+        """
+        parser.add_argument(
+            "--state-dir",
+            help="Directory to create the local environment in. Defaults to '.ufbt'.",
+            default=".ufbt",
+        )
+
+        parser.add_argument(
+            "--no-link-toolchain",
+            help="Don't link toolchain directory to the local environment and create a local copy",
+            action="store_true",
+            default=False,
+        )
+
+    @staticmethod
+    def _link_dir(target_path, source_path):
+        log.info(f"Linking {target_path=} to {source_path=}")
+        if os.path.lexists(target_path) or os.path.exists(target_path):
+            os.unlink(target_path)
+        if platform.system() == "Windows":
+            # Crete junction - does not require admin rights
+            import _winapi
+
+            if not os.path.isdir(source_path):
+                raise ValueError(f"Source path {source_path} is not a directory")
+
+            if not os.path.exists(target_path):
+                _winapi.CreateJunction(source_path, target_path)
+        else:
+            os.symlink(source_path, target_path)
+
+    def _func(self, args) -> int:
+        if os.path.exists(ENV_FILE_NAME):
+            log.error(
+                f"File {ENV_FILE_NAME} already exists, refusing to overwrite. Please remove or update it manually."
+            )
+            return 1
+
+        env_sdk_deployer = UfbtSdkDeployer(args.state_dir, STATE_DIR_TOOLCHAIN_SUBDIR)
+        # Will extract toolchain dir from env
+        default_sdk_deployer = UfbtSdkDeployer(args.ufbt_home)
+
+        env_sdk_deployer.ufbt_state_dir.mkdir(parents=True, exist_ok=True)
+        if args.no_link_toolchain:
+            log.info("Skipping toolchain directory linking")
+        else:
+            env_sdk_deployer.ufbt_state_dir.mkdir(parents=True, exist_ok=True)
+            default_sdk_deployer.toolchain_dir.mkdir(parents=True, exist_ok=True)
+            self._link_dir(
+                str(env_sdk_deployer.toolchain_dir.absolute()),
+                str(default_sdk_deployer.toolchain_dir.absolute()),
+            )
+            log.info("To use a local copy, specify --no-link-toolchain")
+
+        env_vars = {
+            "UFBT_HOME": args.state_dir,
+            # "TOOLCHAIN_PATH": str(env_sdk_deployer.toolchain_dir.absolute()),
+        }
+
+        with open(ENV_FILE_NAME, "wt") as f:
+            for key, value in env_vars.items():
+                f.write(f"{key}={value}\n")
+
+        log.info(f"Created {ENV_FILE_NAME} file in {os.getcwd()}")
+        return 0
+
+
+bootstrap_subcommand_classes = (
+    UpdateSubcommand,
+    CleanSubcommand,
+    StatusSubcommand,
+    LocalEnvSubcommand,
+)
 
 bootstrap_subcommands = (
     subcommand_cls.COMMAND for subcommand_cls in bootstrap_subcommand_classes
