@@ -21,15 +21,11 @@ import os
 import pathlib
 import platform
 import sys
+
 import oslex
 
-from .bootstrap import (
-    DEFAULT_UFBT_HOME,
-    ENV_FILE_NAME,
-    bootstrap_cli,
-    bootstrap_subcommands,
-    get_ufbt_package_version,
-)
+from .bootstrap.paths import DEFAULT_UFBT_HOME, ENV_FILE_NAME
+from .bootstrap.util import get_ufbt_package_version
 
 __version__ = get_ufbt_package_version()
 
@@ -54,6 +50,9 @@ def _load_env_file(env_file):
 
 
 def ufbt_cli():
+    from .bootstrap.cli import entry_point
+    from .bootstrap.command import ALL_NAMES
+
     # load environment variables from .env file in current directory
     try:
         env_vars = _load_env_file(ENV_FILE_NAME)
@@ -78,11 +77,11 @@ def ufbt_cli():
 
     # if any of bootstrap subcommands are in the arguments - call it instead
     # kept for compatibility with old scripts, better use `ufbt-bootstrap` directly
-    if any(map(sys.argv.__contains__, bootstrap_subcommands)):
-        return bootstrap_cli()
+    if any(map(sys.argv.__contains__, ALL_NAMES)):
+        return entry_point()
 
     if not os.path.exists(ufbt_state_dir / "current"):
-        bootstrap_cli(["update"])
+        entry_point(["update"])
 
     if not (
         ufbt_script_root := ufbt_state_dir / "current" / "scripts" / "ufbt"

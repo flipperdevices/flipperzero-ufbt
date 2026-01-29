@@ -20,7 +20,7 @@ classifiers = [
     "Topic :: Software Development :: Build Tools",
     "Topic :: Software Development :: Compilers",
     "Topic :: Software Development :: Embedded Systems",
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
     "Operating System :: MacOS",
     "Operating System :: Microsoft :: Windows",
@@ -35,7 +35,7 @@ issues = "https://github.com/flipperdevices/flipperzero-ufbt/issues"
 
 [project.scripts]
 ufbt = "ufbt:ufbt_cli"
-ufbt-bootstrap = "ufbt.bootstrap:bootstrap_cli"
+ufbt-bootstrap = "ufbt.bootstrap.cli:entry_point"
 
 # https://setuptools-git-versioning.readthedocs.io/en/stable/schemas/file/dev_release_file.html#development-releases-prereleases-from-dev-branch
 [tool.setuptools-git-versioning]
