@@ -119,7 +119,12 @@ def ufbt_cli():
     retcode = os.system(commandline)
     if platform.system() != "Windows":
         # low byte is signal number, high byte is exit code
-        retcode = retcode >> 8
+        if os.WIFSIGNALED(retcode):
+            # killed by a signal, so there is no exit code to shift out -
+            # report it the way a shell does instead of looking successful
+            retcode = 128 + os.WTERMSIG(retcode)
+        else:
+            retcode = os.WEXITSTATUS(retcode)
     return retcode
 
 
